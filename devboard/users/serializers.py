@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from django.contrib.auth import get_user_model
+from django.contrib.auth import get_user_model, authenticate
 import re
 
 User = get_user_model()
@@ -41,3 +41,30 @@ class RegisterSerializer(serializers.ModelSerializer):
         user = User.objects.create_user(**validated_data, password=password)
 
         return user
+
+class LoginSerializer(serializers.Serializer):
+    identifier = serializers.CharField()
+    password = serializers.CharField(write_only=True)
+
+    def validate(self, data):
+        identifier = data.get("identifier")
+        password = data.get("password")
+
+        if not identifier or not password:
+            raise serializers.ValidationError("Both credentials are required.")
+        
+        if "@" in identifier:
+            user = User.objects.filter(email=identifier).first()
+            if not user:
+                raise serializers.ValidationError("Invalid login credentials")
+            username = user.username
+        else:
+            username = identifier
+
+        user = authenticate(username=username, password=password)
+
+        if not user:
+            raise serializers.ValidationError("Invalid login credentials")
+        
+        data["user"] = user
+        return data
