@@ -2,7 +2,8 @@ from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status
 from rest_framework_simplejwt.tokens import RefreshToken
-from users.serializers import UserSerializer, RegisterSerializer, LoginSerializer
+from rest_framework.permissions import IsAuthenticated
+from users.serializers import UserSerializer, RegisterSerializer, LoginSerializer, LogoutSerializer
 from users.permissions import IsAnonymous
 
 def _get_token_pair_for_user(user):
@@ -105,4 +106,34 @@ class LoginView(APIView):
                 },
                 status=status.HTTP_200_OK
             )
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+class LogoutView(APIView):
+    """
+    User logout endpoint.
+
+    Methods:
+    - POST /api/{version}/logout/ -> Blacklist refresh token
+
+    Permission: IsAuthenticated
+
+    Request body:
+    {
+      "refresh": "<refresh_token>"
+    }
+
+    Response: 204 No Content on success
+
+    Notes:
+    - Requires SimpleJWT token_blacklist app to be enabled in INSTALLED_APPS.
+    - Blacklisting prevents token reuse after logout.
+    """
+    permission_classes = [IsAuthenticated]
+    
+    def post(self, request):
+        serializer = LogoutSerializer(data=request.data)
+
+        if serializer.is_valid():
+            serializer.save()
+            return Response(status=status.HTTP_204_NO_CONTENT)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
