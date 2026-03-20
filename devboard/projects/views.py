@@ -62,7 +62,7 @@ class ProjectMembersView(APIView):
         # 🔒 Only owner can add members
         if project.owner != request.user:
             return Response(
-                {"detail": "Only owner cad add members"},
+                {"detail": "Only owner can add members"},
                 status=status.HTTP_403_FORBIDDEN
             )
         
@@ -72,9 +72,7 @@ class ProjectMembersView(APIView):
         )
 
         if serializer.is_valid():
-            user_id = serializer.validated_data["user_id"]
-            user = User.objects.get(id=user_id)
-
+            user = serializer.validated_data["user"]
             project.members.add(user)
 
             return Response(
@@ -83,7 +81,7 @@ class ProjectMembersView(APIView):
             )
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
-class RemoveMembersView(APIView):
+class RemoveMemberView(APIView):
     permission_classes = [IsAuthenticated]
 
     def get_project(self, pk, user):

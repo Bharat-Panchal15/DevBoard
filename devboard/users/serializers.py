@@ -75,7 +75,7 @@ class LogoutSerializer(serializers.Serializer):
     refresh = serializers.CharField()
 
     def validate(self, data):
-        self.token = data["refresh"]
+        self.token = data.get("refresh")
         return data
     
     def save(self, **kwargs):

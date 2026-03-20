@@ -40,4 +40,4 @@ class MemberSerializer(serializers.Serializer):
         if project.members.filter(id=user.id).exists():
             raise serializers.ValidationError("User already a member")
         
-        return user_id
+        return user
