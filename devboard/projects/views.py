@@ -72,7 +72,7 @@ class ProjectMembersView(APIView):
         )
 
         if serializer.is_valid():
-            user = serializer.validated_data["user"]
+            user = serializer.validated_data["user_id"]
             project.members.add(user)
 
             return Response(
