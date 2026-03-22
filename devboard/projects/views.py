@@ -12,6 +12,47 @@ from projects.permissions import IsOwner
 User = get_user_model()
 
 class ProjectListCreateView(ListCreateAPIView):
+    """
+    Project list & creation endpoint.
+
+    Methods:
+    - GET  /api/projects/     -> List all projects for authenticated user
+    - POST /api/projects/     -> Create a new project
+
+    Permission: IsAuthenticated
+
+    GET Response:
+    [
+        {
+            "id": 1,
+            "name": "DevBoard",
+            "description": "Project desc",
+            "owner": "user1",
+            "members": [1],
+            "created_at": "2026-03-20T07:47:15Z"
+        }
+    ]
+
+    POST Request:
+    {
+        "name": "DevBoard",
+        "description": "My backend project"
+    }
+
+    POST Response:
+    {
+        "id": 1,
+        "name": "DevBoard",
+        "description": "My backend project",
+        "owner": "user1",
+        "members": [1],
+        "created_at": "2026-03-20T07:47:15Z"
+    }
+
+    Notes:
+    - Owner is automatically set to the authenticated user
+    - Owner is automatically added to members
+    """
     serializer_class = ProjectSerializer
     permission_classes = [IsAuthenticated]
 
@@ -20,8 +61,46 @@ class ProjectListCreateView(ListCreateAPIView):
         return Project.objects.filter(members=user).distinct()
 
 class ProjectDetailView(RetrieveUpdateDestroyAPIView):
+    """
+    Project detail endpoint.
+
+    Methods:
+    - GET    /api/projects/{id}/     -> Retrieve project details
+    - PUT    /api/projects/{id}/     -> Update entire project
+    - PATCH  /api/projects/{id}/     -> Partial update
+    - DELETE /api/projects/{id}/     -> Delete project
+
+    Permission:
+    - GET: Project members only
+    - PUT/PATCH/DELETE: Owner only
+
+    GET Response:
+    {
+        "id": 1,
+        "name": "DevBoard",
+        "description": "Project desc",
+        "owner": "user1",
+        "members": [1, 2],
+        "created_at": "2026-03-20T07:47:15Z"
+    }
+
+    PUT/PATCH Request:
+    {
+        "name": "Updated Name",
+        "description": "Updated description"
+    }
+
+    DELETE Response:
+    - 204 No Content
+
+    Notes:
+    - Only project members can view
+    - Only owner can update or delete
+    """
     serializer_class = ProjectSerializer
     permission_classes = [IsAuthenticated]
+    lookup_field = "id"
+    lookup_url_kwarg = "id"
 
     def get_queryset(self):
         user = self.request.user
@@ -33,31 +112,68 @@ class ProjectDetailView(RetrieveUpdateDestroyAPIView):
         return [IsAuthenticated()]
 
 class ProjectMembersView(APIView):
+    """
+    Project members management endpoint.
+
+    Methods:
+    - GET  /api/projects/{id}/members/  -> List project members
+    - POST /api/projects/{id}/members/  -> Add a member
+
+    Permission:
+    - GET: Project members only
+    - POST: Owner only
+
+    GET Response:
+    [
+        {
+            "id": 1,
+            "username": "user1",
+            "email": "user1@example.com"
+        }
+    ]
+
+    POST Request:
+    {
+        "user_id": 2
+    }
+
+    POST Response:
+    {
+        "detail": "Member added successfully"
+    }
+
+    Validation:
+    - User must exist
+    - User must not already be a member
+
+    Notes:
+    - Only project owner can add members
+    """
     permission_classes = [IsAuthenticated]
 
-    def get_project(self, pk, user):
+    def get_project(self, id, user):
         """
         Fetch project only if user is a member.
         Otherwise return 404 (security).
         """
-        return get_object_or_404(Project.objects.filter(members=user), pk=pk)
+        return get_object_or_404(Project.objects.filter(members=user), id=id)
     
-    def get(self, request, pk):
+    def get(self, request, id):
         """
         GET /projects/{id}/members/
         List all members (only for project members)
         """
-        project = self.get_project(pk, request.user)
+        project = self.get_project(id, request.user)
         members = project.members.all().values("id", "username", "email")
 
         return Response(members, status=status.HTTP_200_OK)
     
-    def post(self, request, pk):
+    def post(self, request, id):
         """
         POST /projects/{id}/members/
         Add a new member (only owner)
         """
-        project = self.get_project(pk, request.user)
+        project = self.get_project(id, request.user)
 
         # 🔒 Only owner can add members
         if project.owner != request.user:
@@ -82,21 +198,50 @@ class ProjectMembersView(APIView):
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 class RemoveMemberView(APIView):
+    """
+    Remove project member endpoint.
+
+    Methods:
+    - DELETE /api/projects/{id}/members/{user_id}/
+
+    Permission:
+    - Owner only
+
+    Response:
+    - 204 No Content
+
+    Errors:
+    {
+        "detail": "Only owner can remove members"
+    }
+
+    {
+        "detail": "Owner cannot be removed from the project"
+    }
+
+    {
+        "detail": "User is not a member of this project"
+    }
+
+    Notes:
+    - Owner cannot remove themselves
+    - Only existing members can be removed
+    """
     permission_classes = [IsAuthenticated]
 
-    def get_project(self, pk, user):
+    def get_project(self, id, user):
         """
         Fetch project only if user is a member.
         Otherwise return 404 (security).
         """
-        return get_object_or_404(Project.objects.filter(members=user), pk=pk)
+        return get_object_or_404(Project.objects.filter(members=user), id=id)
     
-    def delete(self, request, pk, user_id):
+    def delete(self, request, id, user_id):
         """
         DELETE /projects/{id}/members/{user_id}/
         Only owner can remove members.
         """
-        project = self.get_project(pk, request.user)
+        project = self.get_project(id, request.user)
 
         # 🔒 Only owner can remove members
         if project.owner != request.user:
