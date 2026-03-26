@@ -16,6 +16,11 @@ class Project(models.Model):
 
 class Event(models.Model):
 
+    class Meta:
+        indexes = [
+            models.Index(fields=["project", "created_at"]),
+        ]
+
     class ActionChoices(models.TextChoices):
         PROJECT_CREATED = "PROJECT_CREATED"
         PROJECT_UPDATED = "PROJECT_UPDATED"

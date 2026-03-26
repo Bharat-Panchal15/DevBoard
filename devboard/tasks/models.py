@@ -6,6 +6,13 @@ User = get_user_model()
 
 class Task(models.Model):
 
+    class Meta:
+        indexes = [
+            models.Index(fields=["status"]),
+            models.Index(fields=["project", "status"]),
+            models.Index(fields=["project", "assigned_to"]),
+        ]
+
     class StatusChoices(models.TextChoices):
         TODO = "TODO", "To Do"
         IN_PROGRESS = "IN_PROGRESS", "In Progress"
