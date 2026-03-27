@@ -3,11 +3,13 @@ from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
 from rest_framework import status
+from rest_framework.exceptions import ValidationError
 from django.shortcuts import get_object_or_404
 from django.contrib.auth import get_user_model
 from projects.models import Project
 from projects.serializers import ProjectSerializer, MemberSerializer
 from projects.permissions import IsOwner
+from projects.services import create_project, update_project, remove_project, add_member, remove_member
 
 User = get_user_model()
 
@@ -57,8 +59,14 @@ class ProjectListCreateView(ListCreateAPIView):
     permission_classes = [IsAuthenticated]
 
     def get_queryset(self):
-        user = self.request.user
-        return Project.objects.filter(members=user).distinct()
+        return Project.objects.filter(members=self.request.user).distinct()
+    
+    def perform_create(self, serializer):
+        project = create_project(
+            user=self.request.user,
+            data=serializer.validated_data
+        )
+        serializer.instance = project
 
 class ProjectDetailView(RetrieveUpdateDestroyAPIView):
     """
@@ -110,6 +118,26 @@ class ProjectDetailView(RetrieveUpdateDestroyAPIView):
         if self.request.method in ["PUT", "PATCH", "DELETE"]:
             return [IsAuthenticated(), IsOwner()]
         return [IsAuthenticated()]
+    
+    def perform_update(self, serializer):
+        try:
+            project = update_project(
+                user=self.request.user,
+                project=self.get_object(),
+                data=serializer.validated_data
+            )
+        except ValueError as err:
+            raise ValidationError({"detail": str(err)})
+        serializer.instance = project
+    
+    def perform_destroy(self, instance):
+        try:
+            remove_project(
+                user=self.request.user,
+                project=instance
+            )
+        except ValueError as err:
+            raise ValidationError({"detail": str(err)})
 
 class ProjectMembersView(APIView):
     """
@@ -177,24 +205,26 @@ class ProjectMembersView(APIView):
 
         # 🔒 Only owner can add members
         if project.owner != request.user:
-            return Response(
-                {"detail": "Only owner can add members"},
-                status=status.HTTP_403_FORBIDDEN
-            )
-        
+            return Response({"detail": "Only owner can add members"}, status=status.HTTP_403_FORBIDDEN)
+
         serializer = MemberSerializer(
             data=request.data,
             context={"request": request, "project": project}
         )
 
         if serializer.is_valid():
-            user = serializer.validated_data["user_id"]
-            project.members.add(user)
+            member = serializer.validated_data["user_id"]
 
-            return Response(
-                {"detail": "Member added successfully"},
-                status=status.HTTP_201_CREATED
-            )
+            try:
+                add_member(
+                    user=self.request.user,
+                    project=project,
+                    member=member
+                )
+            except ValueError as err:
+                return Response({"detail": str(err)}, status=status.HTTP_400_BAD_REQUEST)
+
+            return Response({"detail": "Member added successfully"}, status=status.HTTP_201_CREATED)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 class RemoveMemberView(APIView):
@@ -242,30 +272,14 @@ class RemoveMemberView(APIView):
         Only owner can remove members.
         """
         project = self.get_project(id, request.user)
+        member = get_object_or_404(User, id=user_id)
 
-        # 🔒 Only owner can remove members
-        if project.owner != request.user:
-            return Response(
-                {"detail": "Only owner can remove members"},
-                status=status.HTTP_403_FORBIDDEN
+        try:
+            remove_member(
+                user=self.request.user,
+                project=project,
+                member=member
             )
-        
-        # ❌ Prevent removing owner
-        if project.owner.id == user_id:
-            return Response(
-                {"detail": "Owner cannot be removed from the project"},
-                status=status.HTTP_400_BAD_REQUEST
-            )
-        
-        user = get_object_or_404(User, id=user_id)
-
-        # ❌ Check if user is actually a member
-        if not project.members.filter(id=user.id).exists():
-            return Response(
-                {"detail": "User is not a member of this project"},
-                status=status.HTTP_400_BAD_REQUEST
-            )
-        
-        project.members.remove(user)
-
-        return Response(status=status.HTTP_204_NO_CONTENT)
+            return Response(status=status.HTTP_204_NO_CONTENT)
+        except Exception as err:
+            return Response({"detail": str(err)}, status=status.HTTP_400_BAD_REQUEST)
