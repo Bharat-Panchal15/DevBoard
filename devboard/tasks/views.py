@@ -1,10 +1,11 @@
 from rest_framework.generics import ListCreateAPIView, RetrieveUpdateDestroyAPIView
 from rest_framework.permissions import IsAuthenticated
-from rest_framework.exceptions import PermissionDenied
+from rest_framework.exceptions import PermissionDenied, ValidationError
 from django.shortcuts import get_object_or_404
 from tasks.serializers import TaskSerializer
 from tasks.models import Task
 from tasks.permissions import IsMember
+from tasks.services import create_task, update_task, delete_task, assign_task, change_status
 from projects.models import Project
 
 class TaskListCreateView(ListCreateAPIView):
@@ -77,14 +78,25 @@ class TaskListCreateView(ListCreateAPIView):
     
     def get_queryset(self):
         """Return task only for this project"""
-        project = self.get_project()
-        return Task.objects.filter(project=project)
+        return Task.objects.filter(project= self.get_project())
     
     def get_serializer_context(self):
         """Pass project to serializer"""
         context = super().get_serializer_context()
         context["project"] = self.get_project()
         return context
+    
+    def perform_create(self, serializer):
+        try:
+            task = create_task(
+                user=self.request.user,
+                project=self.get_project(),
+                data=serializer.validated_data
+            )
+        except Exception as err:
+            raise ValidationError({"detail": str(err)})
+        
+        serializer.instance = task
 
 class TaskDetailView(RetrieveUpdateDestroyAPIView):
     """
@@ -132,7 +144,8 @@ class TaskDetailView(RetrieveUpdateDestroyAPIView):
     4. Update title/description:
     {
         "title": "Updated title",
-        "description": "Updated description"
+        "description": "Updated description",
+        "due_date": "2026-04-01"
     }
 
     DELETE Response:
@@ -157,3 +170,44 @@ class TaskDetailView(RetrieveUpdateDestroyAPIView):
         context = super().get_serializer_context()
         context["project"] = self.get_object().project
         return context
+    
+    def perform_update(self, serializer):
+        task = serializer.instance
+        data = serializer.validated_data
+
+        try:
+            if "assigned_to" in data:
+                assign_task(
+                    user=self.request.user,
+                    project=task.project,
+                    task=task,
+                    assignee=data["assigned_to"]
+                )
+            
+            if "status" in data:
+                change_status(
+                    user=self.request.user,
+                    project=task.project,
+                    task=task,
+                    status=data["status"]
+                )
+
+            update_fields = {key: value for key, value in data.items() if key not in ["assigned_to", "status"]}
+
+            if update_fields:
+                update_task(
+                    user=self.request.user,
+                    project=task.project,
+                    task=task,
+                    data=update_fields
+                )
+        except ValueError as err:
+            raise ValidationError({"detail": str(err)})
+        serializer.instance = task
+
+    def perform_destroy(self, task):
+        delete_task(
+            user=self.request.user,
+            project=task.project,
+            task=task
+        )

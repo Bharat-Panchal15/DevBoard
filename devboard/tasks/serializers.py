@@ -22,15 +22,12 @@ class TaskSerializer(serializers.ModelSerializer):
         """
         project = self.context.get("project")
 
-        if user and not project.members.filter(id=user.id).exists():
+        if user and project and not project.members.filter(id=user.id).exists():
             raise serializers.ValidationError("User must be a member of this project")
         
         return user
-        
-    def create(self, validated_data):
-        project = self.context.get("project")
-
-        return Task.objects.create(
-            project=project,
-            **validated_data
-        )
+    
+    def validate_status(self, value):
+        if value not in Task.StatusChoices.values:
+            raise serializers.ValidationError("Invalid status")
+        return value

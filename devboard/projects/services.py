@@ -1,4 +1,4 @@
-from typing import Optional, Dict, Any
+from typing import Dict, Any
 from users.models import User
 from projects.models import Project
 from services.events import create_event
@@ -32,9 +32,6 @@ def update_project(*, user: User, project: Project, data: Dict[str, Any]) -> Pro
     - track field-level changes
     - create event only if something changed
     """
-
-    if project.owner != user:
-        raise ValueError("Only project owner can update the project")
     
     changes: Dict[str, Dict[str, Any]] = {}
 
@@ -44,8 +41,8 @@ def update_project(*, user: User, project: Project, data: Dict[str, Any]) -> Pro
 
         if new_value != old_value:
             changes[field] = {
-                "from": old_value,
-                "to": new_value
+                "from": old_value if old_value else None,
+                "to": new_value if new_value else None
             }
             setattr(project, field, new_value)
         
@@ -69,9 +66,6 @@ def remove_project(*, user: User, project: Project) -> None:
     - only owner can delete
     - no event required
     """
-
-    if project.owner != user:
-        raise ValueError("Only project owner can delete the project")
     
     project.delete()
 
@@ -84,12 +78,9 @@ def add_member(*, user: User, project: Project, member: User) -> None:
     - member must not already exist
     - event must be created
     """
-
-    if project.owner != user:
-        raise ValueError("Only project owner can add members")
-    
+        
     if project.members.filter(id=member.id).exists():
-        raise ValueError("User already a member")
+        raise ValueError("User is already a member")
     
     project.members.add(member)
 
@@ -97,8 +88,7 @@ def add_member(*, user: User, project: Project, member: User) -> None:
         actor=user,
         action="MEMBER_ADDED",
         project=project,
-        target_user=member,
-        metadata={"user_id": member.id}
+        target_user=member
     )
 
 def remove_member(*, user: User, project: Project, member: User) -> None:
@@ -111,9 +101,6 @@ def remove_member(*, user: User, project: Project, member: User) -> None:
     - member must exist in project
     - event must be created
     """
-
-    if project.owner != user:
-        raise ValueError("Only project owner can remove members")
     
     if member == project.owner:
         raise ValueError("Owner cannot be removed from the project")
@@ -127,6 +114,5 @@ def remove_member(*, user: User, project: Project, member: User) -> None:
         actor=user,
         action="MEMBER_REMOVED",
         project=project,
-        target_user=member,
-        metadata={"user_id": member.id}
+        target_user=member
     )
