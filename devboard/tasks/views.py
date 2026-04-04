@@ -1,11 +1,11 @@
-from rest_framework.generics import ListCreateAPIView, RetrieveUpdateDestroyAPIView
+from rest_framework.generics import ListCreateAPIView, RetrieveUpdateDestroyAPIView, DestroyAPIView
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.exceptions import PermissionDenied, ValidationError
 from django.shortcuts import get_object_or_404
-from tasks.serializers import TaskSerializer
-from tasks.models import Task
-from tasks.permissions import IsMember
-from tasks.services import create_task, update_task, delete_task, assign_task, change_status
+from tasks.serializers import TaskSerializer, CommentSerializer
+from tasks.models import Task, Comment
+from tasks.permissions import IsMember, IsAuthor
+from tasks.services import create_task, update_task, delete_task, assign_task, change_status, create_comment, delete_comment
 from projects.models import Project
 
 class TaskListCreateView(ListCreateAPIView):
@@ -210,4 +210,112 @@ class TaskDetailView(RetrieveUpdateDestroyAPIView):
             user=self.request.user,
             project=task.project,
             task=task
+        )
+
+class CommentListCreateView(ListCreateAPIView):
+    """
+    Comment list & creation endpoint (within a task).
+
+    Methods:
+    - GET  /api/tasks/{id}/comments/   -> List all comments for a task
+    - POST /api/tasks/{id}/comments/   -> Create a new comment in the task
+
+    Permission:
+    - Only project members can access
+    - Enforced using IsMember permission
+    
+    GET Response:
+    [
+        {
+            "id": 1,
+            "content": "Great job!",
+            "author": "user1",
+            "created_at": "2026-03-20T07:47:15Z"
+        }
+    ]
+    
+    POST Request:
+    {
+        "content": "Great job!"
+    }
+
+    POST Response:
+    {
+        "id": 1,
+        "content": "Great job!",
+        "author": "user1",
+        "created_at": "2026-03-20T07:47:15Z"
+    }
+
+    Validation:
+    - content cannot be empty
+    - author must be a project member
+
+    Notes:
+    - Task is taken from URL, not request body
+    """
+
+    serializer_class = CommentSerializer
+    permission_classes = [IsAuthenticated]
+
+    def get_task(self):
+        if not hasattr(self, "_task"):
+            task = get_object_or_404(Task, pk=self.kwargs["id"])
+
+            if not task.project.members.filter(id=self.request.user.id).exists():
+                raise PermissionDenied("You are not a member of this project")
+            
+            self._task = task
+        return self._task
+    
+    def get_queryset(self):
+        return Comment.objects.filter(task=self.get_task())
+    
+    def get_serializer_context(self):
+        context = super().get_serializer_context()
+        context["task"] = self.get_task()
+        return context
+    
+    def perform_create(self, serializer):
+        try:
+            comment = create_comment(
+                user=self.request.user,
+                task=self.get_task(),
+                data=serializer.validated_data
+            )
+        except Exception as err:
+            raise ValidationError({"detail": str(err)})
+        serializer.instance = comment
+    
+class CommentDetailView(DestroyAPIView):
+    """
+    Comment detail endpoint.
+
+    Methods:
+    - DELETE /api/comments/{id}/   -> Delete a comment
+
+    Permission:
+    - Only project members can access
+    - Enforced using IsMember permission
+
+    DELETE Response:
+    - 204 No Content
+
+    Validation:
+    - author must be a project member
+    """
+
+    serializer_class = CommentSerializer
+    permission_classes = [IsAuthenticated, IsAuthor]
+    lookup_field = "id"
+    lookup_url_kwarg = "id"
+
+    def get_queryset(self):
+        return Comment.objects.filter(task__project__members=self.request.user)
+    
+    def perform_destroy(self, comment):
+        delete_comment(
+            user=self.request.user,
+            task=comment.task,
+            comment=comment
         )

@@ -1,7 +1,7 @@
 from typing import Optional, Dict, Any
 from users.models import User
 from projects.models import Project
-from tasks.models import Task
+from tasks.models import Task, Comment
 from services.events import create_event
 
 
@@ -152,3 +152,38 @@ def change_status(*, user: User, project: Project, task: Task, status: str) -> T
     )
 
     return task
+
+def create_comment(*, user: User, task: Task, data: Dict[str, Any]) -> Comment:
+    """
+    Create a new comment
+
+    Rules:
+    - user must be a project member
+    - event must be created
+    """
+    
+    comment = Comment.objects.create(
+        author=user,
+        task=task,
+        **data
+    )
+
+    create_event(
+        actor=user,
+        action="COMMENT_ADDED",
+        project=task.project,
+        task=task
+    )
+
+    return comment
+
+def delete_comment(*, user: User, task: Task, comment: Comment) -> None:
+    """
+    Delete a comment.
+
+    Rules:
+    - user must be a comment author
+    - no event required
+    """
+    
+    comment.delete()

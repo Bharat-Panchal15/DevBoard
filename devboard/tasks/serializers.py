@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from tasks.models import Task
+from tasks.models import Task, Comment
 from django.contrib.auth import get_user_model
 
 User = get_user_model()
@@ -31,3 +31,16 @@ class TaskSerializer(serializers.ModelSerializer):
         if value not in Task.StatusChoices.values:
             raise serializers.ValidationError("Invalid status")
         return value
+
+class CommentSerializer(serializers.ModelSerializer):
+    author = serializers.ReadOnlyField(source="author.username")
+
+    class Meta:
+        model = Comment
+        fields = ["id", "content", "author", "created_at"]
+        read_only_fields = ["author", "created_at"]
+
+    def validate_content(self, value):
+        if not value.strip():
+            raise serializers.ValidationError("Comment cannot be empty")
+        return value.strip()

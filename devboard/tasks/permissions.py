@@ -6,3 +6,9 @@ class IsMember(BasePermission):
 
     def has_object_permission(self, request, view, obj):
         return obj.project.members.filter(id=request.user.id).exists()
+
+class IsAuthor(BasePermission):
+    """Allows access only to the comment author"""
+
+    def has_object_permission(self, request, view, obj):
+        return obj.author == request.user
