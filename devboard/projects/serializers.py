@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from projects.models import Project
+from projects.models import Project, Event
 from django.contrib.auth import get_user_model
 
 User = get_user_model()
@@ -29,3 +29,12 @@ class MemberSerializer(serializers.Serializer):
             raise serializers.ValidationError("User already a member")
         
         return user
+
+class EventSerializer(serializers.ModelSerializer):
+    actor = serializers.ReadOnlyField(source="actor.username")
+    target_user = serializers.ReadOnlyField(source="target_user.username")
+
+    class Meta:
+        model = Event
+        fields = ["id", "actor", "action", "task", "target_user", "metadata", "created_at"]
+        read_only_fields = fields

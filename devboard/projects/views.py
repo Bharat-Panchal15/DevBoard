@@ -1,4 +1,4 @@
-from rest_framework.generics import ListCreateAPIView, RetrieveUpdateDestroyAPIView
+from rest_framework.generics import ListAPIView, ListCreateAPIView, RetrieveUpdateDestroyAPIView
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
@@ -6,8 +6,8 @@ from rest_framework import status
 from rest_framework.exceptions import ValidationError
 from django.shortcuts import get_object_or_404
 from django.contrib.auth import get_user_model
-from projects.models import Project
-from projects.serializers import ProjectSerializer, MemberSerializer
+from projects.models import Project, Event
+from projects.serializers import ProjectSerializer, MemberSerializer, EventSerializer
 from projects.permissions import IsOwner
 from projects.services import create_project, update_project, remove_project, add_member, remove_member
 
@@ -283,3 +283,36 @@ class RemoveMemberView(APIView):
             return Response(status=status.HTTP_204_NO_CONTENT)
         except Exception as err:
             return Response({"detail": str(err)}, status=status.HTTP_400_BAD_REQUEST)
+
+class EventListView(ListAPIView):
+    """
+    Project event log endpoint.
+
+    Methods:
+    - GET /api/projects/{id}/events/
+
+    Permission:
+    - Project members only
+
+    Response:
+    [
+        {
+            "id": 1,
+            "actor": "user1",
+            "action": "PROJECT_CREATED",
+            "project": 1,
+            "task": 1,
+            "target_user": 2,
+            "metadata": {...},
+            "created_at": "2026-03-20T07:47:15Z"
+        }
+    ]
+    """
+
+    serializer_class = EventSerializer
+    permission_classes = [IsAuthenticated]
+
+    def get_queryset(self):
+        project = get_object_or_404(Project.objects.filter(members=self.request.user), id=self.kwargs["id"])
+
+        return Event.objects.filter(project=project).order_by("-created_at")
