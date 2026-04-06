@@ -1,17 +1,10 @@
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status
-from rest_framework_simplejwt.tokens import RefreshToken
 from rest_framework.permissions import IsAuthenticated
 from users.serializers import UserSerializer, RegisterSerializer, LoginSerializer, LogoutSerializer
 from users.permissions import IsAnonymous
-
-def _get_token_pair_for_user(user):
-    """Helper: Build token pair for a user"""
-    refresh = RefreshToken.for_user(user)
-    access = refresh.access_token
-
-    return str(access), str(refresh)
+from users.services import  register_user, login_user, logout_user
 
 class RegisterView(APIView):
     """
@@ -47,9 +40,7 @@ class RegisterView(APIView):
         serializer = RegisterSerializer(data=request.data)
 
         if serializer.is_valid():
-            user = serializer.save()
-
-            access_token, refresh_token = _get_token_pair_for_user(user)
+            user, access_token , refresh_token = register_user(data=serializer.validated_data)
             user_data = UserSerializer(user, context={"request": request}).data
 
             return Response(
@@ -93,9 +84,11 @@ class LoginView(APIView):
         serializer = LoginSerializer(data=request.data)
 
         if serializer.is_valid():
-            user = serializer.validated_data["user"]
-
-            access_token, refresh_token = _get_token_pair_for_user(user)
+            try:
+                user, access_token, refresh_token = login_user(identifier=serializer.validated_data["identifier"], password=serializer.validated_data["password"])
+            except ValueError as err:
+                return Response({"detail": str(err)}, status=status.HTTP_400_BAD_REQUEST)
+            
             user_data = UserSerializer(user, context={"request": request}).data
 
             return Response(
@@ -134,6 +127,9 @@ class LogoutView(APIView):
         serializer = LogoutSerializer(data=request.data)
 
         if serializer.is_valid():
-            serializer.save()
+            try:
+                logout_user(refresh=serializer.validated_data["refresh"])
+            except ValueError as err:
+                return Response({"detail": str(err)}, status=status.HTTP_400_BAD_REQUEST)
             return Response(status=status.HTTP_204_NO_CONTENT)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
