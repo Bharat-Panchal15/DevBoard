@@ -10,10 +10,11 @@ class TaskSerializer(serializers.ModelSerializer):
         required=False,
         allow_null=True
     )
+    created_by = serializers.ReadOnlyField(source="created_by.username")
 
     class Meta:
         model = Task
-        fields = ["id", "title", "description", "project", "assigned_to", "status", "created_at", "due_date"]
+        fields = ["id", "title", "description", "project", "assigned_to", "created_by", "status", "created_at", "due_date"]
         read_only_fields = ["project", "created_at"]
 
     def validate_assigned_to(self, user):
