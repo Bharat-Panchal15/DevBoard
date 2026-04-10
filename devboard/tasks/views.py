@@ -64,6 +64,11 @@ class TaskListCreateView(ListCreateAPIView):
     serializer_class = TaskSerializer
     permission_classes = [IsAuthenticated]
 
+    filterset_fields = ["status"]
+    search_fields = ["title"]
+    ordering_fields = ["due_date", "created_at"]
+    ordering = ["-created_at"]
+
     def get_project(self):
         """Fetch project and ensure user is a member"""
         if not hasattr(self, "_project"):
@@ -78,7 +83,15 @@ class TaskListCreateView(ListCreateAPIView):
     
     def get_queryset(self):
         """Return task only for this project"""
-        return Task.objects.filter(project= self.get_project())
+        queryset = Task.objects.filter(project= self.get_project())
+        assigned_to = self.request.query_params.get("assigned_to")
+
+        if assigned_to == "me":
+            queryset = queryset.filter(assigned_to=self.request.user)
+        elif assigned_to is not None:
+            queryset = queryset.filter(assigned_to=assigned_to)
+
+        return queryset
     
     def get_serializer_context(self):
         """Pass project to serializer"""
