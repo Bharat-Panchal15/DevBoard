@@ -1,5 +1,6 @@
 from typing import Dict, Any
 from django.contrib.auth import authenticate
+from django.db import IntegrityError
 from rest_framework_simplejwt.tokens import RefreshToken
 from rest_framework_simplejwt.exceptions import TokenError
 from users.models import User
@@ -21,9 +22,12 @@ def register_user(*, data: Dict[str, Any]) -> tuple[User, str, str]:
     - email must be unique
     - password is hashed before storage
     """
-
-    password = data.pop("password")
-    user = User.objects.create_user(**data, password=password)
+    try:
+        password = data.pop("password")
+        user = User.objects.create_user(**data, password=password)
+    except IntegrityError:
+        raise ValueError("A user with this email already exists")
+    
     access, refresh = _get_token_pair(user)
     return user, access, refresh
 
