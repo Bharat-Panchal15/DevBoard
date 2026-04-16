@@ -24,6 +24,7 @@ class UserFactory(DjangoModelFactory):
 class ProjectFactory(DjangoModelFactory):
     class Meta:
         model = Project
+        skip_postgeneration_save = True
 
     
     name = factory.Sequence(lambda n: f"Project {n}")

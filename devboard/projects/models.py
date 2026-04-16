@@ -4,6 +4,9 @@ from django.contrib.auth import get_user_model
 User = get_user_model()
 
 class Project(models.Model):
+    class Meta:
+        ordering = ["-created_at"]
+    
     name = models.CharField(max_length=100)
     description = models.TextField(blank=True)
     owner = models.ForeignKey(User, on_delete=models.CASCADE, related_name="owned_projects") # user.owned_projects.all() → projects user owns
