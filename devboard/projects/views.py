@@ -2,10 +2,11 @@ from rest_framework.generics import ListAPIView, ListCreateAPIView, RetrieveUpda
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
-from rest_framework import status
+from rest_framework import status, serializers
 from rest_framework.exceptions import ValidationError
 from django.shortcuts import get_object_or_404
 from django.contrib.auth import get_user_model
+from drf_spectacular.utils import extend_schema, extend_schema_view, OpenApiResponse, inline_serializer
 from projects.models import Project, Event
 from projects.serializers import ProjectSerializer, MemberSerializer, EventSerializer
 from projects.permissions import IsOwner
@@ -13,6 +14,10 @@ from projects.services import create_project, update_project, remove_project, ad
 
 User = get_user_model()
 
+@extend_schema_view(
+    get=extend_schema(tags=["Projects"]),
+    post=extend_schema(tags=["Projects"]),
+)
 class ProjectListCreateView(ListCreateAPIView):
     """
     Project list & creation endpoint.
@@ -59,6 +64,8 @@ class ProjectListCreateView(ListCreateAPIView):
     permission_classes = [IsAuthenticated]
 
     def get_queryset(self):
+        if getattr(self, "swagger_fake_view", False):
+            return Project.objects.none()
         return Project.objects.filter(members=self.request.user).distinct()
     
     def perform_create(self, serializer):
@@ -68,6 +75,12 @@ class ProjectListCreateView(ListCreateAPIView):
         )
         serializer.instance = project
 
+@extend_schema_view(
+    get=extend_schema(tags=["Projects"]),
+    put=extend_schema(tags=["Projects"]),
+    patch=extend_schema(tags=["Projects"]),
+    delete=extend_schema(tags=["Projects"]),
+)
 class ProjectDetailView(RetrieveUpdateDestroyAPIView):
     """
     Project detail endpoint.
@@ -111,8 +124,9 @@ class ProjectDetailView(RetrieveUpdateDestroyAPIView):
     lookup_url_kwarg = "id"
 
     def get_queryset(self):
-        user = self.request.user
-        return Project.objects.filter(members=user).distinct()
+        if getattr(self, "swagger_fake_view", False):
+            return Project.objects.none()
+        return Project.objects.filter(members=self.request.user).distinct()
 
     def get_permissions(self):
         if self.request.method in ["PUT", "PATCH", "DELETE"]:
@@ -186,6 +200,22 @@ class ProjectMembersView(APIView):
         """
         return get_object_or_404(Project.objects.filter(members=user), id=id)
     
+    @extend_schema(
+            tags=["Members"],
+            responses={
+                200: inline_serializer(
+                    name="MemberListResponse",
+                    fields={
+                        "id": serializers.IntegerField(),
+                        "username": serializers.CharField(),
+                        "email": serializers.EmailField(),
+                    }
+                ),
+                404: OpenApiResponse(description="Project not found or not a member"),
+            },
+            summary="List project members",
+            description="Returns all members of a project. Only accessible to project members."
+    )
     def get(self, request, id):
         """
         GET /projects/{id}/members/
@@ -196,6 +226,18 @@ class ProjectMembersView(APIView):
 
         return Response(members, status=status.HTTP_200_OK)
     
+    @extend_schema(
+            tags=["Members"],
+            request=MemberSerializer,
+            responses={
+                201: OpenApiResponse(description="Member added successfully"),
+                400: OpenApiResponse(description="Validation error or user already a member"),
+                403: OpenApiResponse(description="Only owner can add members"),
+                404: OpenApiResponse(description="Project not found or not a member"),
+            },
+            summary="Add a project member",
+            description="Adds a new member to the project. Only the project owner can perform this action."
+    )
     def post(self, request, id):
         """
         POST /projects/{id}/members/
@@ -266,6 +308,17 @@ class RemoveMemberView(APIView):
         """
         return get_object_or_404(Project.objects.filter(members=user), id=id)
     
+    @extend_schema(
+            tags=["Members"],
+            responses={
+                204: OpenApiResponse(description="Member removed successfully"),
+                400: OpenApiResponse(description="Cannot remove owner or user is not a member"),
+                403: OpenApiResponse(description="Only owner can remove members"),
+                404: OpenApiResponse(description="Project or user not found"),
+            },
+            summary="Remove a project member",
+            description="Removes a membef from the project, Only the project owner can perform this action. Owner cannot be removed."
+    )
     def delete(self, request, id, user_id):
         """
         DELETE /projects/{id}/members/{user_id}/
@@ -284,6 +337,9 @@ class RemoveMemberView(APIView):
         except Exception as err:
             return Response({"detail": str(err)}, status=status.HTTP_400_BAD_REQUEST)
 
+@extend_schema_view(
+    get=extend_schema(tags=["Events"]),
+)
 class EventListView(ListAPIView):
     """
     Project event log endpoint.
@@ -313,6 +369,8 @@ class EventListView(ListAPIView):
     permission_classes = [IsAuthenticated]
 
     def get_queryset(self):
+        if getattr(self, "swagger_fake_view", False):
+            return Event.objects.none()
         project = get_object_or_404(Project.objects.filter(members=self.request.user), id=self.kwargs["id"])
 
         return Event.objects.filter(project=project).order_by("-created_at")

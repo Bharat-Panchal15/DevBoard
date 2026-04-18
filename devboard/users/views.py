@@ -1,10 +1,21 @@
 from rest_framework.views import APIView
 from rest_framework.response import Response
-from rest_framework import status
+from rest_framework import status, serializers
 from rest_framework.permissions import IsAuthenticated
+from drf_spectacular.utils import extend_schema, OpenApiResponse, inline_serializer
 from users.serializers import UserSerializer, RegisterSerializer, LoginSerializer, LogoutSerializer
 from users.permissions import IsAnonymous
 from users.services import  register_user, login_user, logout_user
+
+def _auth_response_serializer(name="AuthResponse"):
+    return inline_serializer(
+        name=name,
+        fields={
+            "user": UserSerializer(),
+            "access": serializers.CharField(),
+            "refresh": serializers.CharField(),
+        }
+    )
 
 class RegisterView(APIView):
     """
@@ -36,6 +47,17 @@ class RegisterView(APIView):
     """
     permission_classes = [IsAnonymous]
 
+    @extend_schema(
+            tags=["Users"],
+            request=RegisterSerializer,
+            responses={
+                201: _auth_response_serializer(name="RegisterResponse"),
+                400: OpenApiResponse(description="Validation error"),
+                403: OpenApiResponse(description="Already authenticated"),
+            },
+            summary="Register a new user",
+            description="Creates a new user account and returns JWT tokens."
+    )
     def post(self, request):
         serializer = RegisterSerializer(data=request.data)
 
@@ -80,6 +102,17 @@ class LoginView(APIView):
     """
     permission_classes = [IsAnonymous]
 
+    @extend_schema(
+            tags=["Users"],
+            request=LoginSerializer,
+            responses={
+                200: _auth_response_serializer(name="LoginResponse"),
+                400: OpenApiResponse(description="Invalid credentials"),
+                403: OpenApiResponse(description="Already authenticated"),
+            },
+            summary="Login with username or email",
+            description="Authenticate a user using username or email and returns JWT tokens."
+    )
     def post(self, request):
         serializer = LoginSerializer(data=request.data)
 
@@ -123,6 +156,17 @@ class LogoutView(APIView):
     """
     permission_classes = [IsAuthenticated]
     
+    @extend_schema(
+            tags=["Users"],
+            request=LogoutSerializer,
+            responses={
+                204: OpenApiResponse(description="Logged out successfully"),
+                400: OpenApiResponse(description="Invalid or expired token"),
+                401: OpenApiResponse(description="Authentication required"),
+            },
+            summary="Logout and blacklist refresh token",
+            description="Blacklists the provided refresh token, effectively logging the user out."
+    )
     def post(self, request):
         serializer = LogoutSerializer(data=request.data)
 

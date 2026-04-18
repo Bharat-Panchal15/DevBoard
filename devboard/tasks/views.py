@@ -2,12 +2,17 @@ from rest_framework.generics import ListCreateAPIView, RetrieveUpdateDestroyAPIV
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.exceptions import PermissionDenied, ValidationError
 from django.shortcuts import get_object_or_404
+from drf_spectacular.utils import extend_schema, extend_schema_view
 from tasks.serializers import TaskSerializer, CommentSerializer
 from tasks.models import Task, Comment
 from tasks.permissions import IsMember, IsAuthor
 from tasks.services import create_task, update_task, delete_task, assign_task, change_status, create_comment, delete_comment
 from projects.models import Project
 
+@extend_schema_view(
+    get=extend_schema(tags=["Tasks"]),
+    post=extend_schema(tags=["Tasks"]),
+)
 class TaskListCreateView(ListCreateAPIView):
     """
     Task list & creation endpoint (within a project).
@@ -83,6 +88,8 @@ class TaskListCreateView(ListCreateAPIView):
     
     def get_queryset(self):
         """Return task only for this project"""
+        if getattr(self, "swagger_fake_view", False):
+            return Task.objects.none()
         queryset = Task.objects.filter(project= self.get_project())
         assigned_to = self.request.query_params.get("assigned_to")
 
@@ -111,6 +118,12 @@ class TaskListCreateView(ListCreateAPIView):
         
         serializer.instance = task
 
+@extend_schema_view(
+    get=extend_schema(tags=["Tasks"]),
+    put=extend_schema(tags=["Tasks"]),
+    patch=extend_schema(tags=["Tasks"]),
+    delete=extend_schema(tags=["Tasks"]),
+)
 class TaskDetailView(RetrieveUpdateDestroyAPIView):
     """
     Task detail endpoint.
@@ -177,6 +190,8 @@ class TaskDetailView(RetrieveUpdateDestroyAPIView):
     lookup_url_kwarg = "id"
 
     def get_queryset(self):
+        if getattr(self, "swagger_fake_view", False):
+            return Task.objects.none()
         return Task.objects.filter(project__members=self.request.user)
     
     def get_serializer_context(self):
@@ -225,6 +240,10 @@ class TaskDetailView(RetrieveUpdateDestroyAPIView):
             task=task
         )
 
+@extend_schema_view(
+    get=extend_schema(tags=["Comments"]),
+    post=extend_schema(tags=["Comments"]),
+)
 class CommentListCreateView(ListCreateAPIView):
     """
     Comment list & creation endpoint (within a task).
@@ -282,6 +301,8 @@ class CommentListCreateView(ListCreateAPIView):
         return self._task
     
     def get_queryset(self):
+        if getattr(self, "swagger_fake_view", False):
+            return Comment.objects.none()
         return Comment.objects.filter(task=self.get_task())
     
     def get_serializer_context(self):
@@ -299,8 +320,11 @@ class CommentListCreateView(ListCreateAPIView):
         except Exception as err:
             raise ValidationError({"detail": str(err)})
         serializer.instance = comment
-    
-class CommentDetailView(DestroyAPIView):
+
+@extend_schema_view(
+    delete=extend_schema(tags=["Comments"]),
+)    
+class CommentDeleteView(DestroyAPIView):
     """
     Comment detail endpoint.
 
@@ -324,6 +348,8 @@ class CommentDetailView(DestroyAPIView):
     lookup_url_kwarg = "id"
 
     def get_queryset(self):
+        if getattr(self, "swagger_fake_view", False):
+            return Comment.objects.none()
         return Comment.objects.filter(task__project__members=self.request.user)
     
     def perform_destroy(self, comment):

@@ -1,7 +1,9 @@
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
+from rest_framework import serializers
 from django.db.models import Q, Count
+from drf_spectacular.utils import extend_schema, inline_serializer
 from projects.models import Project
 from tasks.models import Task
 
@@ -33,6 +35,21 @@ class DashboardView(APIView):
     """
     permission_classes = [IsAuthenticated]
 
+    @extend_schema(
+            tags=["Dashboard"],
+            responses={
+                200: inline_serializer(
+                    name="DashboardResponse",
+                    fields={
+                        "total_projects": serializers.IntegerField(),
+                        "total_tasks": serializers.IntegerField(),
+                        "completed_tasks": serializers.IntegerField()
+                    }
+                )
+            },
+            summary="Get dashboard summary",
+            description="Returns aggregated statistics for the authenticated user's projects and tasks."
+    )
     def get(self, request):
         user = request.user
         projects = Project.objects.filter(members=user).distinct()
