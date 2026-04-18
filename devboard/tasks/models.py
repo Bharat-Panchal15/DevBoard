@@ -32,6 +32,9 @@ class Task(models.Model):
         return self.title
 
 class Comment(models.Model):
+    class Meta:
+        ordering = ["-created_at"]
+        
     task = models.ForeignKey(Task, on_delete=models.CASCADE, related_name="comments")
     author = models.ForeignKey(User, on_delete=models.CASCADE, related_name="comments")
     content = models.TextField()

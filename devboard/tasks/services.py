@@ -4,7 +4,6 @@ from projects.models import Project
 from tasks.models import Task, Comment
 from services.events import create_event
 
-
 def create_task(*, user: User, project: Project, data: Dict[str, Any]) -> Task:
     """
     Create a new task.
@@ -97,7 +96,7 @@ def assign_task(*, user: User, project: Project, task: Task, assignee: Optional[
     - create event only if assignee changed
     """
 
-    if assignee and project.members.filter(id=assignee.id).exists():
+    if assignee and not project.members.filter(id=assignee.id).exists():
         raise ValueError("Assigned user must be a project member")
     
     old_assignee = task.assigned_to

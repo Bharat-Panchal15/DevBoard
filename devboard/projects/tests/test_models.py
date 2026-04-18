@@ -1,6 +1,6 @@
 import pytest
-from tests.factories import UserFactory, ProjectFactory, TaskFactory
-from projects.models import Project, Event
+from tests.factories import ProjectFactory, TaskFactory
+from projects.models import Project
 from services.events import create_event
 
 @pytest.mark.django_db

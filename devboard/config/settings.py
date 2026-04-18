@@ -49,6 +49,7 @@ INSTALLED_APPS = [
     'rest_framework',
     'rest_framework_simplejwt.token_blacklist',
     'django_filters',
+    'drf_spectacular',
     'users.apps.UsersConfig',
     'projects.apps.ProjectsConfig',
     'tasks.apps.TasksConfig',
@@ -81,7 +82,8 @@ REST_FRAMEWORK = {
     ],
     'DEFAULT_VERSIONING_CLASS': 'rest_framework.versioning.URLPathVersioning',
     'DEFAULT_VERSION': 'v1',
-    "ALLOWED_VERSIONS": ['v1']
+    'ALLOWED_VERSIONS': ['v1'],
+    'DEFAULT_SCHEMA_CLASS': 'drf_spectacular.openapi.AutoSchema',
 }
 
 SIMPLE_JWT = {
@@ -163,3 +165,10 @@ STATIC_URL = 'static/'
 
 
 AUTH_USER_MODEL = 'users.User'
+
+
+SPECTACULAR_SETTINGS = {
+    'TITLE': 'DevBoard API',
+    'DESCRIPTION': 'A project and task management API',
+    'VERSION': '1.0.0',
+}
