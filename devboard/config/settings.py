@@ -58,6 +58,7 @@ INSTALLED_APPS = [
 
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
+    'config.middleware.RequestLoggingMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
@@ -176,4 +177,72 @@ SPECTACULAR_SETTINGS = {
     'TITLE': 'DevBoard API',
     'DESCRIPTION': 'A project and task management API',
     'VERSION': '1.0.0',
+}
+
+
+# Logging
+
+APP_LOG_LEVEL = env("APP_LOG_LEVEL", default="DEBUG")
+DJANGO_LOG_LEVEL = env("DJANGO_LOG_LEVEL", default="INFO")
+API_LOG_LEVEL = env("API_LOG_LEVEL", default="INFO")
+ERROR_LOG_LEVEL = env("ERROR_LOG_LEVEL", default="ERROR")
+
+LOG_DIR = BASE_DIR.parent / "logs"
+LOG_DIR.mkdir(exist_ok=True)
+
+LOGGING = {
+    "version": 1,
+    "disable_existing_loggers": False,
+    "formatters": {
+        "standard": {
+            "format": "[{levelname} {asctime} {name}: {message}]",
+            "style": "{"
+        },
+        "verbose": {
+            "format": "[{levelname}] {asctime} {name} ({pathname}: {lineno}): {message}",
+            "style": "{",
+        },
+    },
+    "handlers": {
+        "console": {
+            "class": "logging.StreamHandler",
+            "formatter": "standard",
+            "level": APP_LOG_LEVEL,
+        },
+        "api_file": {
+            "class": "logging.FileHandler",
+            "filename": LOG_DIR / "api.log",
+            "formatter": "standard",
+            "level": API_LOG_LEVEL,
+        },
+        "django_file": {
+            "class": "logging.FileHandler",
+            "filename": LOG_DIR / "django.log",
+            "formatter": "standard",
+            "level": DJANGO_LOG_LEVEL,
+        },
+        "error_file": {
+            "class": "logging.FileHandler",
+            "filename": LOG_DIR / "error.log",
+            "formatter": "verbose",
+            "level": ERROR_LOG_LEVEL,
+        },
+    },
+    "loggers": {
+        "django": {
+            "handlers": ["console", "django_file"],
+            "level": DJANGO_LOG_LEVEL,
+            "propagate": False,
+        },
+        "django.request": {
+            "handlers": ["console", "error_file"],
+            "level": ERROR_LOG_LEVEL,
+            "propagate": False,
+        },
+        "api": {
+            "handlers": ["console", "api_file", "error_file"],
+            "level": API_LOG_LEVEL,
+            "propagate": True,
+        },
+    },
 }

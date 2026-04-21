@@ -1,9 +1,12 @@
+import logging
 from typing import Dict, Any
 from django.contrib.auth import authenticate
 from django.db import IntegrityError
 from rest_framework_simplejwt.tokens import RefreshToken
 from rest_framework_simplejwt.exceptions import TokenError
 from users.models import User
+
+logger = logging.getLogger("api.users")
 
 def _get_token_pair(user: User) -> tuple[str, str]:
     """
@@ -26,8 +29,10 @@ def register_user(*, data: Dict[str, Any]) -> tuple[User, str, str]:
         password = data.pop("password")
         user = User.objects.create_user(**data, password=password)
     except IntegrityError:
+        logger.warning("Registration failed - duplicate email", extra={"email": data.get("email")})
         raise ValueError("A user with this email already exists")
     
+    logger.info("User registered successfully", extra={"user_id": user.id, "username": user.username})
     access, refresh = _get_token_pair(user)
     return user, access, refresh
 
@@ -42,6 +47,7 @@ def login_user(*, identifier: str, password: str) -> tuple[User, str, str]:
     if "@" in identifier:
         user = User.objects.filter(email=identifier).first()
         if not user:
+            logger.warning("Login failed - Invalid credentials", extra={"identifier": identifier})
             raise ValueError("Invalid login credentials")
         username = user.username
     else:
@@ -49,8 +55,10 @@ def login_user(*, identifier: str, password: str) -> tuple[User, str, str]:
     user = authenticate(username=username, password=password)
 
     if not user:
+        logger.warning("Login failed - Invalid credentials", extra={"identifier": identifier})
         raise ValueError("Invalid login credentials")
 
+    logger.info("User login successful", extra={"username": user.username})
     access, refresh = _get_token_pair(user)
     return user, access, refresh
 
@@ -66,4 +74,7 @@ def logout_user(*, refresh: str) -> None:
         token = RefreshToken(refresh)
         token.blacklist()
     except TokenError:
+        logger.error("Logout failed - invalid or expired token", exc_info=True)
         raise ValueError("Invalid or expired Token")
+    
+    logger.info("User logout successful")

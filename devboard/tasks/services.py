@@ -1,8 +1,11 @@
+import logging
 from typing import Optional, Dict, Any
 from users.models import User
 from projects.models import Project
 from tasks.models import Task, Comment
 from services.events import create_event
+
+logger = logging.getLogger("api.tasks")
 
 def create_task(*, user: User, project: Project, data: Dict[str, Any]) -> Task:
     """
@@ -16,11 +19,13 @@ def create_task(*, user: User, project: Project, data: Dict[str, Any]) -> Task:
     """
 
     if not project.members.filter(id=user.id).exists():
+        logger.warning("Task creation failed - user not a member", extra={"project_id": project.id, "user_id": user.id})
         raise ValueError("User is not a member of this project")
     
     assigned_to: Optional[User] = data.get("assigned_to")
 
     if assigned_to and not project.members.filter(id=assigned_to.id).exists():
+        logger.warning("Task creation failed - assignee not a member", extra={"project_id": project.id, "assignee_id": assigned_to.id})
         raise ValueError("Assigned user must be a project member")
     
     task = Task.objects.create(
@@ -35,6 +40,7 @@ def create_task(*, user: User, project: Project, data: Dict[str, Any]) -> Task:
         project=project,
         task=task
     )
+    logger.info("Task created", extra={"task_id": task.id, "project_id": project.id, "user_id": user.id})
 
     return task
 
@@ -72,6 +78,7 @@ def update_task(*, user: User, project: Project, task: Task, data: Dict[str, Any
             task=task,
             metadata={"fields": changes}
         )
+        logger.info("Task updated", extra={"task_id": task.id, "project_id": project.id, "user_id": user.id, "fields": list(changes.keys())})
     
     return task
 
@@ -84,7 +91,9 @@ def delete_task(*,user: User, project: Project, task: Task) -> None:
     - no event required
     """
 
+    task_id = task.id
     task.delete()
+    logger.info("Task deleted", extra={"task_id": task_id, "project_id": project.id, "user_id": user.id})
 
 def assign_task(*, user: User, project: Project, task: Task, assignee: Optional[User]) -> Task:
     """
@@ -97,6 +106,7 @@ def assign_task(*, user: User, project: Project, task: Task, assignee: Optional[
     """
 
     if assignee and not project.members.filter(id=assignee.id).exists():
+        logger.warning("Task assignment failed - assignee not a member", extra={"task_id": task.id, "assignee_id": assignee.id})
         raise ValueError("Assigned user must be a project member")
     
     old_assignee = task.assigned_to
@@ -118,6 +128,7 @@ def assign_task(*, user: User, project: Project, task: Task, assignee: Optional[
             "to": assignee.id if assignee else None
         }
     )
+    logger.info("Task assigned", extra={"task_id": task.id, "project_id": project.id, "assignee_id": assignee.id if assignee else None})
 
     return task
 
@@ -149,6 +160,7 @@ def change_status(*, user: User, project: Project, task: Task, status: str) -> T
             "to": status
         }
     )
+    logger.info("Task status changed", extra={"task_id": task.id, "project_id": project.id, "from": old_status, "to": status})
 
     return task
 
@@ -173,6 +185,7 @@ def create_comment(*, user: User, task: Task, data: Dict[str, Any]) -> Comment:
         project=task.project,
         task=task
     )
+    logger.info("Comment created", extra={"comment_id": comment.id, "task_id": task.id, "user_id": user.id})
 
     return comment
 
@@ -184,5 +197,6 @@ def delete_comment(*, user: User, task: Task, comment: Comment) -> None:
     - user must be a comment author
     - no event required
     """
-    
+    comment_id = comment.id
     comment.delete()
+    logger.info("Comment deleted", extra={"comment_id": comment_id, "task_id": task.id, "user_id": user.id})

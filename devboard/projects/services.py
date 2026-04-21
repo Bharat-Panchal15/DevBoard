@@ -1,7 +1,10 @@
+import logging
 from typing import Dict, Any
 from users.models import User
 from projects.models import Project
 from services.events import create_event
+
+logger = logging.getLogger("api.projects")
 
 def create_project(*, user: User, data: Dict[str,Any]) -> Project:
     """Create a new Project
@@ -20,6 +23,7 @@ def create_project(*, user: User, data: Dict[str,Any]) -> Project:
 
     # Create event
     create_event(actor=user, action="PROJECT_CREATED", project=project)
+    logger.info("Project created", extra={"project_id": project.id, "user_id": user.id})
     
     return project
 
@@ -55,6 +59,7 @@ def update_project(*, user: User, project: Project, data: Dict[str, Any]) -> Pro
             project=project,
             metadata={"fields": changes}
         )
+        logger.info("Project updated", extra={"project_id": project.id, "user_id": user.id, "fields": list(changes.keys())})
     
     return project
 
@@ -66,8 +71,9 @@ def remove_project(*, user: User, project: Project) -> None:
     - only owner can delete
     - no event required
     """
-    
+    project_id = project.id
     project.delete()
+    logger.info("Project deleted", extra={"project_id":project_id, "user_id": user.id})
 
 def add_member(*, user: User, project: Project, member: User) -> None:
     """
@@ -80,6 +86,7 @@ def add_member(*, user: User, project: Project, member: User) -> None:
     """
         
     if project.members.filter(id=member.id).exists():
+        logger.warning("Add member failed - already a member", extra={"project_id": project.id, "user_id": user.id, "member_id": member.id})
         raise ValueError("User is already a member")
     
     project.members.add(member)
@@ -90,6 +97,7 @@ def add_member(*, user: User, project: Project, member: User) -> None:
         project=project,
         target_user=member
     )
+    logger.info("Member added", extra={"project_id": project.id, "user_id": user.id, "member_id": member.id})
 
 def remove_member(*, user: User, project: Project, member: User) -> None:
     """
@@ -103,9 +111,11 @@ def remove_member(*, user: User, project: Project, member: User) -> None:
     """
     
     if member == project.owner:
+        logger.warning("Remove member failed - cannot remove owner", extra={"project_id": project.id, "user_id": user.id, "member_id": member.id})
         raise ValueError("Owner cannot be removed from the project")
     
     if not project.members.filter(id=member.id).exists():
+        logger.warning("Remove member failed - not a member", extra={"project_id": project.id, "user_id": user.id, "member_id": member.id})
         raise ValueError("User is not a member of this project")
     
     project.members.remove(member)
@@ -116,3 +126,4 @@ def remove_member(*, user: User, project: Project, member: User) -> None:
         project=project,
         target_user=member
     )
+    logger.info("Member removed", extra={"project_id": project.id, "member_id": member.id, "user_id": user.id})
