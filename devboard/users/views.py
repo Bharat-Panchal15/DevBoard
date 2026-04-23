@@ -6,6 +6,7 @@ from drf_spectacular.utils import extend_schema, OpenApiResponse, inline_seriali
 from users.serializers import UserSerializer, RegisterSerializer, LoginSerializer, LogoutSerializer
 from users.permissions import IsAnonymous
 from users.services import  register_user, login_user, logout_user
+from users.throttles import RegisterRateThrottle, LoginRateThrottle
 
 def _auth_response_serializer(name="AuthResponse"):
     return inline_serializer(
@@ -46,6 +47,7 @@ class RegisterView(APIView):
     - Password is hashed before storage.
     """
     permission_classes = [IsAnonymous]
+    throttle_classes = [RegisterRateThrottle]
 
     @extend_schema(
             tags=["Users"],
@@ -101,6 +103,7 @@ class LoginView(APIView):
     - Returns 200 OK with tokens on successful login.
     """
     permission_classes = [IsAnonymous]
+    throttle_classes = [LoginRateThrottle]
 
     @extend_schema(
             tags=["Users"],

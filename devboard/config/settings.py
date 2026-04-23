@@ -85,6 +85,16 @@ REST_FRAMEWORK = {
     'DEFAULT_VERSION': 'v1',
     'ALLOWED_VERSIONS': ['v1'],
     'DEFAULT_SCHEMA_CLASS': 'drf_spectacular.openapi.AutoSchema',
+    'DEFAULT_THROTTLE_CLASSES': [
+        'rest_framework.throttling.AnonRateThrottle',
+        'rest_framework.throttling.UserRateThrottle',
+    ],
+    'DEFAULT_THROTTLE_RATES': {
+        'anon': '100/day',
+        'user': '1000/day',
+        'login': '10/minute',
+        'register': '20/hour',
+    },
 }
 
 SIMPLE_JWT = {
