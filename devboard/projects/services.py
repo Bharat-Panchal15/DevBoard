@@ -3,6 +3,7 @@ from typing import Dict, Any
 from users.models import User
 from projects.models import Project
 from services.events import create_event
+from services.cache import invalidate_dashboard_cache
 
 logger = logging.getLogger("api.projects")
 
@@ -20,6 +21,9 @@ def create_project(*, user: User, data: Dict[str,Any]) -> Project:
 
     # Add owner to members
     project.members.add(user)
+
+    #Invalidate cache
+    invalidate_dashboard_cache(user.id)
 
     # Create event
     create_event(actor=user, action="PROJECT_CREATED", project=project)
@@ -73,6 +77,7 @@ def remove_project(*, user: User, project: Project) -> None:
     """
     project_id = project.id
     project.delete()
+    invalidate_dashboard_cache(user.id)
     logger.info("Project deleted", extra={"project_id":project_id, "user_id": user.id})
 
 def add_member(*, user: User, project: Project, member: User) -> None:

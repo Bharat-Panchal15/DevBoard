@@ -4,6 +4,7 @@ from users.models import User
 from projects.models import Project
 from tasks.models import Task, Comment
 from services.events import create_event
+from services.cache import invalidate_dashboard_cache
 
 logger = logging.getLogger("api.tasks")
 
@@ -33,6 +34,8 @@ def create_task(*, user: User, project: Project, data: Dict[str, Any]) -> Task:
         created_by=user,
         **data
     )
+
+    invalidate_dashboard_cache(user.id)
 
     create_event(
         actor=user,
@@ -93,6 +96,7 @@ def delete_task(*,user: User, project: Project, task: Task) -> None:
 
     task_id = task.id
     task.delete()
+    invalidate_dashboard_cache(user.id)
     logger.info("Task deleted", extra={"task_id": task_id, "project_id": project.id, "user_id": user.id})
 
 def assign_task(*, user: User, project: Project, task: Task, assignee: Optional[User]) -> Task:
@@ -149,6 +153,8 @@ def change_status(*, user: User, project: Project, task: Task, status: str) -> T
     
     task.status = status
     task.save()
+
+    invalidate_dashboard_cache(user.id)
 
     create_event(
         actor=user,

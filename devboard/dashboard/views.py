@@ -3,6 +3,7 @@ from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
 from rest_framework import serializers
 from django.db.models import Q, Count
+from django.core.cache import cache
 from drf_spectacular.utils import extend_schema, inline_serializer
 from projects.models import Project
 from tasks.models import Task
@@ -52,6 +53,11 @@ class DashboardView(APIView):
     )
     def get(self, request):
         user = request.user
+        cache_key = f"dashboard:user:{user.id}"
+
+        cached = cache.get(cache_key)
+        if cached:
+            return Response(cached)
         projects = Project.objects.filter(members=user).distinct()
         tasks = Task.objects.filter(project__in=projects)
 
@@ -60,8 +66,11 @@ class DashboardView(APIView):
             completed_tasks = Count("id", filter=Q(status="DONE"))
         )
 
-        return Response({
+        data = {
             "total_projects": projects.count(),
             "total_tasks": stats["total_tasks"],
             "completed_tasks": stats["completed_tasks"]
-        })
+        }
+
+        cache.set(cache_key, data, timeout=300)
+        return Response(data)
