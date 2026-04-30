@@ -94,6 +94,10 @@ REST_FRAMEWORK = {
         'user': '1000/day',
         'login': '10/minute',
         'register': '20/hour',
+        'project': '30/hour',
+        'member': '30/hour',
+        'task': '60/hour',
+        'comment': '30/hour',
     },
 }
 

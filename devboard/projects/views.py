@@ -11,6 +11,7 @@ from projects.models import Project, Event
 from projects.serializers import ProjectSerializer, MemberSerializer, EventSerializer
 from projects.permissions import IsOwner
 from projects.services import create_project, update_project, remove_project, add_member, remove_member
+from projects.throttles import ProjectRateThrottle, MemberRateThrottle
 
 User = get_user_model()
 
@@ -63,6 +64,11 @@ class ProjectListCreateView(ListCreateAPIView):
     serializer_class = ProjectSerializer
     permission_classes = [IsAuthenticated]
 
+    def get_throttles(self):
+        if self.request.method == "POST":
+            return [ProjectRateThrottle()]
+        return super().get_throttles()
+    
     def get_queryset(self):
         if getattr(self, "swagger_fake_view", False):
             return Project.objects.none()
@@ -122,6 +128,11 @@ class ProjectDetailView(RetrieveUpdateDestroyAPIView):
     permission_classes = [IsAuthenticated]
     lookup_field = "id"
     lookup_url_kwarg = "id"
+
+    def get_throttles(self):
+        if self.request.method in ["PUT", "PATCH", "DELETE"]:
+            return [ProjectRateThrottle()]
+        return super().get_throttles()
 
     def get_queryset(self):
         if getattr(self, "swagger_fake_view", False):
@@ -192,6 +203,11 @@ class ProjectMembersView(APIView):
     - Only project owner can add members
     """
     permission_classes = [IsAuthenticated]
+
+    def get_throttles(self):
+        if self.request.method == 'POST':
+            return [MemberRateThrottle()]
+        return super().get_throttles()
 
     def get_project(self, id, user):
         """
@@ -300,6 +316,11 @@ class RemoveMemberView(APIView):
     - Only existing members can be removed
     """
     permission_classes = [IsAuthenticated]
+
+    def get_throttles(self):
+        if self.request.method == "DELETE":
+            return [MemberRateThrottle()]
+        return super().get_throttles()
 
     def get_project(self, id, user):
         """

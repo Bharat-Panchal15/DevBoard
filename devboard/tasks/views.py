@@ -7,6 +7,7 @@ from tasks.serializers import TaskSerializer, CommentSerializer
 from tasks.models import Task, Comment
 from tasks.permissions import IsMember, IsAuthor
 from tasks.services import create_task, update_task, delete_task, assign_task, change_status, create_comment, delete_comment
+from tasks.throttles import TaskRateThrottle, CommentRateThrottle
 from projects.models import Project
 
 @extend_schema_view(
@@ -73,6 +74,11 @@ class TaskListCreateView(ListCreateAPIView):
     search_fields = ["title"]
     ordering_fields = ["due_date", "created_at"]
     ordering = ["-created_at"]
+
+    def get_throttles(self):
+        if self.request.method == "POST":
+            return [TaskRateThrottle()]
+        return super().get_throttles()
 
     def get_project(self):
         """Fetch project and ensure user is a member"""
@@ -189,6 +195,11 @@ class TaskDetailView(RetrieveUpdateDestroyAPIView):
     lookup_field = "id"
     lookup_url_kwarg = "id"
 
+    def get_throttles(self):
+        if self.request.method in ["PUT", "PATCH", "DELETE"]:
+            return [TaskRateThrottle()]
+        return super().get_throttles()
+
     def get_queryset(self):
         if getattr(self, "swagger_fake_view", False):
             return Task.objects.none()
@@ -289,6 +300,11 @@ class CommentListCreateView(ListCreateAPIView):
 
     serializer_class = CommentSerializer
     permission_classes = [IsAuthenticated]
+
+    def get_throttles(self):
+        if self.request.method == "POST":
+            return [CommentRateThrottle()]
+        return super().get_throttles()
 
     def get_task(self):
         if not hasattr(self, "_task"):
