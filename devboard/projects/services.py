@@ -3,7 +3,7 @@ from typing import Dict, Any
 from users.models import User
 from projects.models import Project
 from services.events import create_event
-from services.cache import invalidate_dashboard_cache
+from services.cache import invalidate_dashboard_cache, invalidate_project_list_cache
 
 logger = logging.getLogger("api.projects")
 
@@ -24,6 +24,7 @@ def create_project(*, user: User, data: Dict[str,Any]) -> Project:
 
     #Invalidate cache
     invalidate_dashboard_cache(user.id)
+    invalidate_project_list_cache(user.id)
 
     # Create event
     create_event(actor=user, action="PROJECT_CREATED", project=project)
@@ -77,7 +78,9 @@ def remove_project(*, user: User, project: Project) -> None:
     """
     project_id = project.id
     project.delete()
+
     invalidate_dashboard_cache(user.id)
+    invalidate_project_list_cache(user.id)
     logger.info("Project deleted", extra={"project_id":project_id, "user_id": user.id})
 
 def add_member(*, user: User, project: Project, member: User) -> None:
@@ -95,6 +98,8 @@ def add_member(*, user: User, project: Project, member: User) -> None:
         raise ValueError("User is already a member")
     
     project.members.add(member)
+
+    invalidate_project_list_cache(member.id)
 
     create_event(
         actor=user,
@@ -124,6 +129,8 @@ def remove_member(*, user: User, project: Project, member: User) -> None:
         raise ValueError("User is not a member of this project")
     
     project.members.remove(member)
+
+    invalidate_project_list_cache(member.id)
 
     create_event(
         actor=user,

@@ -3,6 +3,7 @@ from typing import Optional, Dict, Any
 from users.models import User
 from projects.models import Project, Event
 from tasks.models import Task
+from services.cache import invalidate_event_list_cache
 
 logger = logging.getLogger("api.events")
 
@@ -42,6 +43,8 @@ def create_event(
     if metadata is not None and not isinstance(metadata, dict):
         logger.warning("Event creation failed - invalid metadata", extra={"metadata": metadata})
         raise ValueError("Metadata must be a dictionary")
+    
+    invalidate_event_list_cache(project.id)
     
     return Event.objects.create(
         actor=actor,

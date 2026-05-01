@@ -6,6 +6,7 @@ from rest_framework import status, serializers
 from rest_framework.exceptions import ValidationError
 from django.shortcuts import get_object_or_404
 from django.contrib.auth import get_user_model
+from django.core.cache import cache
 from drf_spectacular.utils import extend_schema, extend_schema_view, OpenApiResponse, inline_serializer
 from projects.models import Project, Event
 from projects.serializers import ProjectSerializer, MemberSerializer, EventSerializer
@@ -80,6 +81,18 @@ class ProjectListCreateView(ListCreateAPIView):
             data=serializer.validated_data
         )
         serializer.instance = project
+    
+    def list(self, request, *args, **kwargs):
+        cache_key = f"projects:user:{request.user.id}"
+        cached = cache.get(cache_key)
+
+        if cached:
+            return Response(cached)
+        
+        response = super().list(request, *args, **kwargs)
+        cache.set(cache_key, response.data, timeout=300)
+        
+        return response
 
 @extend_schema_view(
     get=extend_schema(tags=["Projects"]),
@@ -395,3 +408,15 @@ class EventListView(ListAPIView):
         project = get_object_or_404(Project.objects.filter(members=self.request.user), id=self.kwargs["id"])
 
         return Event.objects.filter(project=project).order_by("-created_at")
+    
+    def list(self, request, *args, **kwargs):
+        cache_key = f"events:project:{self.kwargs['id']}"
+        cached = cache.get(cache_key)
+
+        if cached:
+            return Response(cached)
+        
+        response = super().list(request, *args, **kwargs)
+        cache.set(cache_key, response.data)
+
+        return response
