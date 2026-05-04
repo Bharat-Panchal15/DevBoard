@@ -4,6 +4,7 @@ from users.models import User
 from projects.models import Project
 from services.events import create_event
 from services.cache import invalidate_dashboard_cache, invalidate_project_list_cache
+from services.email import send_member_added_email
 
 logger = logging.getLogger("api.projects")
 
@@ -98,6 +99,7 @@ def add_member(*, user: User, project: Project, member: User) -> None:
         raise ValueError("User is already a member")
     
     project.members.add(member)
+    send_member_added_email(member, project)
 
     invalidate_project_list_cache(member.id)
 

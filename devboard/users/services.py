@@ -5,6 +5,7 @@ from django.db import IntegrityError
 from rest_framework_simplejwt.tokens import RefreshToken
 from rest_framework_simplejwt.exceptions import TokenError
 from users.models import User
+from services.email import send_welcome_email
 
 logger = logging.getLogger("api.users")
 
@@ -34,6 +35,7 @@ def register_user(*, data: Dict[str, Any]) -> tuple[User, str, str]:
     
     logger.info("User registered successfully", extra={"user_id": user.id, "username": user.username})
     access, refresh = _get_token_pair(user)
+    send_welcome_email(user)
     return user, access, refresh
 
 def login_user(*, identifier: str, password: str) -> tuple[User, str, str]:
