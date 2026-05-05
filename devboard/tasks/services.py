@@ -5,7 +5,7 @@ from projects.models import Project
 from tasks.models import Task, Comment
 from services.events import create_event
 from services.cache import invalidate_dashboard_cache
-from services.email import send_task_assigned_email
+from services.tasks import send_task_assigned_email_task
 
 logger = logging.getLogger("api.tasks")
 
@@ -122,7 +122,7 @@ def assign_task(*, user: User, project: Project, task: Task, assignee: Optional[
     task.assigned_to = assignee
     task.save()
     if assignee:
-        send_task_assigned_email(assignee, task)
+        send_task_assigned_email_task.delay(assignee.id, task.id)
 
     create_event(
         actor=user,
