@@ -98,6 +98,8 @@ REST_FRAMEWORK = {
         'member': '30/hour',
         'task': '60/hour',
         'comment': '30/hour',
+        'otp_verify': '5/hour',
+        'otp_resend': '3/hour',
     },
 }
 

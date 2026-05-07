@@ -42,3 +42,11 @@ def send_task_assigned_email(assignee: User, task: Task):
         html=f"<h2>New Task!</h2><p>You've been assigned: <strong>{task.title}</strong>.</p>",
         to=assignee.email,
     )
+
+def send_otp_email(user: User, code: str) -> None:
+    _send(
+        subject="Your DevBoard verification code",
+        text=f"Your OTP is {code}. Valid for 10 minutes.",
+        html=f"<h2>Verify your email!</h2><p>Your OTP is <strong>{code}</strong>. Valid for 10 minutes</p>",
+        to=user.email,
+    )

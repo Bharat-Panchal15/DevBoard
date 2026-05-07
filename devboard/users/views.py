@@ -3,10 +3,10 @@ from rest_framework.response import Response
 from rest_framework import status, serializers
 from rest_framework.permissions import IsAuthenticated
 from drf_spectacular.utils import extend_schema, OpenApiResponse, inline_serializer
-from users.serializers import UserSerializer, RegisterSerializer, LoginSerializer, LogoutSerializer
+from users.serializers import UserSerializer, RegisterSerializer, LoginSerializer, LogoutSerializer, OTPVerifySerializer, OTPResendSerializer
 from users.permissions import IsAnonymous
-from users.services import  register_user, login_user, logout_user
-from users.throttles import RegisterRateThrottle, LoginRateThrottle
+from users.services import  register_user, login_user, logout_user, verify_otp, resend_otp
+from users.throttles import RegisterRateThrottle, LoginRateThrottle, OTPVerifyRateThrottle, OTPResendRateThrottle
 
 def _auth_response_serializer(name="AuthResponse"):
     return inline_serializer(
@@ -64,15 +64,11 @@ class RegisterView(APIView):
         serializer = RegisterSerializer(data=request.data)
 
         if serializer.is_valid():
-            user, access_token , refresh_token = register_user(data=serializer.validated_data)
-            user_data = UserSerializer(user, context={"request": request}).data
+            register_user(data=serializer.validated_data)
 
             return Response(
-                {
-                    "user": user_data,
-                    "access": access_token,
-                    "refresh": refresh_token,
-                }, status=status.HTTP_201_CREATED
+                {"detail": "OTP sent to your email. Please verify."},
+                status=status.HTTP_201_CREATED
             )
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
@@ -179,4 +175,48 @@ class LogoutView(APIView):
             except ValueError as err:
                 return Response({"detail": str(err)}, status=status.HTTP_400_BAD_REQUEST)
             return Response(status=status.HTTP_204_NO_CONTENT)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+class OTPVerifyView(APIView):
+    permission_classes = [IsAnonymous]
+    throttle_classes = [OTPVerifyRateThrottle]
+
+    def post(self, request):
+        serializer = OTPVerifySerializer(data=request.data)
+
+        if serializer.is_valid():
+            try:
+                user, access, refresh = verify_otp(email=serializer.validated_data["email"], code=serializer.validated_data["code"])
+            except ValueError as err:
+                return Response({"detail": str(err)}, status=status.HTTP_400_BAD_REQUEST)
+            
+            user_data = UserSerializer(user, context={"request": request}).data
+
+            return Response(
+                {
+                    "user": user_data,
+                    "access": access,
+                    "refresh": refresh
+                },
+                status=status.HTTP_200_OK
+            )
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+class OTPResendView(APIView):
+    permission_classes = [IsAnonymous]
+    throttle_classes = [OTPResendRateThrottle]
+
+    def post(self, request):
+        serializer = OTPResendSerializer(data=request.data)
+
+        if serializer.is_valid():
+            try:
+                resend_otp(email=serializer.validated_data["email"])
+            except ValueError as err:
+                return Response({"detail": str(err)}, status=status.HTTP_400_BAD_REQUEST)
+            
+            return Response(
+                {"detail": "New OTP sent to your email"},
+                status=status.HTTP_200_OK
+            )
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)

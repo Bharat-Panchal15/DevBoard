@@ -27,3 +27,11 @@ def send_task_assigned_email_task(user_id: int, task_id: int) -> None:
     user = User.objects.get(id=user_id)
     task = Task.objects.get(id=task_id)
     send_task_assigned_email(user, task)
+
+@shared_task
+def send_otp_email_task(user_id: int, code: str) -> None:
+    from users.models import User
+    from services.email import send_otp_email
+
+    user = User.objects.get(id=user_id)
+    send_otp_email(user, code)
