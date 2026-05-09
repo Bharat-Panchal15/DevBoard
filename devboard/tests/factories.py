@@ -13,6 +13,7 @@ class UserFactory(DjangoModelFactory):
     
     username = factory.Sequence(lambda n: f"user{n}")
     email = factory.Sequence(lambda n: f"user{n}@test.com")
+    is_active = True
 
     @factory.post_generation
     def password(self, create, extracted, **kwargs):

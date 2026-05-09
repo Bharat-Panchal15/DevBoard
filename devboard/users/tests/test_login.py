@@ -1,4 +1,5 @@
 import pytest
+from tests.factories import UserFactory
 
 @pytest.mark.django_db
 class TestLoginView:
@@ -52,3 +53,12 @@ class TestLoginView:
         })
 
         assert response.status_code == 403
+    
+    def test_unverified_user_returns_400(self, api_client):
+        unverified_user = UserFactory(is_active=False)
+        response = api_client.post(self.url, {
+            "identifier": unverified_user.username,
+            "password": "password123"
+        })
+
+        assert response.status_code == 400
