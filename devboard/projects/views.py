@@ -17,8 +17,16 @@ from projects.throttles import ProjectRateThrottle, MemberRateThrottle
 User = get_user_model()
 
 @extend_schema_view(
-    get=extend_schema(tags=["Projects"]),
-    post=extend_schema(tags=["Projects"]),
+    get=extend_schema(
+        tags=["Projects"],
+        summary="List all projects",
+        description="Returns a paginated list of all projects where the authenticated user is a member. Response is cached per user (TTL: 5 minutes)."
+    ),
+    post=extend_schema(
+        tags=["Projects"],
+        summary="Create a new project",
+        description="Creates a new project. The authenticated user is automatically set as owner and added to members."
+    ),
 )
 class ProjectListCreateView(ListCreateAPIView):
     """
@@ -103,10 +111,26 @@ class ProjectListCreateView(ListCreateAPIView):
         return response
 
 @extend_schema_view(
-    get=extend_schema(tags=["Projects"]),
-    put=extend_schema(tags=["Projects"]),
-    patch=extend_schema(tags=["Projects"]),
-    delete=extend_schema(tags=["Projects"]),
+    get=extend_schema(
+        tags=["Projects"],
+        summary="Retrieve a project",
+        description="Returns details of a project. Only accessible to project members. Non-members receive 404.",
+    ),
+    put=extend_schema(
+        tags=["Projects"],
+        summary="Full update a project",
+        description="Fully updates a project. Only accessible to the project owner. An event is recorded only if fields actually changed.",
+    ),
+    patch=extend_schema(
+        tags=["Projects"],
+        summary="Partial update a project",
+        description="Partially updates a project. Only accessible to the project owner. An event is recorded only if fields actually changed.",
+    ),
+    delete=extend_schema(
+        tags=["Projects"],
+        summary="Delete a project",
+        description="Deletes a project and all its associated tasks and events. Only accessible to the project owner.",
+    ),
 )
 class ProjectDetailView(RetrieveUpdateDestroyAPIView):
     """
@@ -251,7 +275,7 @@ class ProjectMembersView(APIView):
                 404: OpenApiResponse(description="Project not found or not a member"),
             },
             summary="List project members",
-            description="Returns all members of a project. Only accessible to project members."
+            description="Returns all members of a project. Only accessible to project members. Non-members receive 404."
     )
     def get(self, request, id):
         """
@@ -268,8 +292,8 @@ class ProjectMembersView(APIView):
             request=MemberSerializer,
             responses={
                 201: OpenApiResponse(description="Member added successfully"),
-                400: OpenApiResponse(description="Validation error or user already a member"),
-                403: OpenApiResponse(description="Only owner can add members"),
+                400: OpenApiResponse(description="User does not exist or is already a member"),
+                403: OpenApiResponse(description="Only the project owner can add members"),
                 404: OpenApiResponse(description="Project not found or not a member"),
             },
             summary="Add a project member",
@@ -346,11 +370,11 @@ class RemoveMemberView(APIView):
             responses={
                 204: OpenApiResponse(description="Member removed successfully"),
                 400: OpenApiResponse(description="Cannot remove owner or user is not a member"),
-                403: OpenApiResponse(description="Only owner can remove members"),
-                404: OpenApiResponse(description="Project or user not found"),
+                403: OpenApiResponse(description="Only the project owner can remove members"),
+                404: OpenApiResponse(description="Project not found or not a member"),
             },
             summary="Remove a project member",
-            description="Removes a membef from the project, Only the project owner can perform this action. Owner cannot be removed."
+            description="Removes a member from the project, Only the project owner can perform this action. Owner cannot be removed."
     )
     def delete(self, request, id, user_id):
         """
@@ -371,7 +395,11 @@ class RemoveMemberView(APIView):
             return Response({"detail": str(err)}, status=status.HTTP_400_BAD_REQUEST)
 
 @extend_schema_view(
-    get=extend_schema(tags=["Events"]),
+    get=extend_schema(
+        tags=["Events"],
+        summary="List project events",
+        description="Returns a paginated list of all events for a project, ordered newest first. Only accessible to project members. Response is cached per project (TTL: 5 minutes)."
+    ),
 )
 class EventListView(ListAPIView):
     """
