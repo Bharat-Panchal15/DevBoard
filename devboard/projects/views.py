@@ -25,22 +25,27 @@ class ProjectListCreateView(ListCreateAPIView):
     Project list & creation endpoint.
 
     Methods:
-    - GET  /api/projects/     -> List all projects for authenticated user
-    - POST /api/projects/     -> Create a new project
+    - GET  /api/v1/projects/     -> List all projects for authenticated user
+    - POST /api/v1/projects/     -> Create a new project
 
     Permission: IsAuthenticated
 
-    GET Response:
-    [
-        {
-            "id": 1,
-            "name": "DevBoard",
-            "description": "Project desc",
-            "owner": "user1",
-            "members": [1],
-            "created_at": "2026-03-20T07:47:15Z"
-        }
-    ]
+    GET Response (200):
+    {
+        "count": 1,
+        "next": null,
+        "previous": null,
+        "results": [
+            {
+                "id": 1,
+                "name": "DevBoard",
+                "description": "My backend project",
+                "owner": "user1",
+                "members": [1],
+                "created_at": "2026-03-20T07:47:15Z"
+            }
+        ]
+    }
 
     POST Request:
     {
@@ -59,8 +64,11 @@ class ProjectListCreateView(ListCreateAPIView):
     }
 
     Notes:
+    - Only projects where the user is a member are returned. 
     - Owner is automatically set to the authenticated user
     - Owner is automatically added to members
+    - Results are paginated (default page size: 20).
+    - Response is cached per user (TTL: 5 minutes).
     """
     serializer_class = ProjectSerializer
     permission_classes = [IsAuthenticated]
@@ -105,20 +113,20 @@ class ProjectDetailView(RetrieveUpdateDestroyAPIView):
     Project detail endpoint.
 
     Methods:
-    - GET    /api/projects/{id}/     -> Retrieve project details
-    - PUT    /api/projects/{id}/     -> Update entire project
-    - PATCH  /api/projects/{id}/     -> Partial update
-    - DELETE /api/projects/{id}/     -> Delete project
+    - GET    /api/v1/projects/{id}/     -> Retrieve project details
+    - PUT    /api/v1/projects/{id}/     -> Full update
+    - PATCH  /api/v1/projects/{id}/     -> Partial update
+    - DELETE /api/v1/projects/{id}/     -> Delete project
 
     Permission:
     - GET: Project members only
-    - PUT/PATCH/DELETE: Owner only
+    - PUT/PATCH/DELETE: Project owner only
 
-    GET Response:
+    GET Response (200):
     {
         "id": 1,
         "name": "DevBoard",
-        "description": "Project desc",
+        "description": "My backend project",
         "owner": "user1",
         "members": [1, 2],
         "created_at": "2026-03-20T07:47:15Z"
@@ -134,8 +142,8 @@ class ProjectDetailView(RetrieveUpdateDestroyAPIView):
     - 204 No Content
 
     Notes:
-    - Only project members can view
-    - Only owner can update or delete
+    - Non-members receive 404 (not 403) to avoid leaking project existence.
+    - An event is recorded on update only if fields actually changed.
     """
     serializer_class = ProjectSerializer
     permission_classes = [IsAuthenticated]
@@ -182,14 +190,14 @@ class ProjectMembersView(APIView):
     Project members management endpoint.
 
     Methods:
-    - GET  /api/projects/{id}/members/  -> List project members
-    - POST /api/projects/{id}/members/  -> Add a member
+    - GET  /api/v1/projects/{id}/members/  -> List project members
+    - POST /api/v1/projects/{id}/members/  -> Add a member
 
     Permission:
     - GET: Project members only
-    - POST: Owner only
+    - POST: Project owner only
 
-    GET Response:
+    GET Response (200):
     [
         {
             "id": 1,
@@ -203,7 +211,7 @@ class ProjectMembersView(APIView):
         "user_id": 2
     }
 
-    POST Response:
+    POST Response (201):
     {
         "detail": "Member added successfully"
     }
@@ -303,30 +311,21 @@ class RemoveMemberView(APIView):
     Remove project member endpoint.
 
     Methods:
-    - DELETE /api/projects/{id}/members/{user_id}/
+    - DELETE /api/v1/projects/{id}/members/{user_id}/ -> Remove a member from the project
 
-    Permission:
-    - Owner only
+    Permission: IsOwner
 
     Response:
     - 204 No Content
 
     Errors:
-    {
-        "detail": "Only owner can remove members"
-    }
-
-    {
-        "detail": "Owner cannot be removed from the project"
-    }
-
-    {
-        "detail": "User is not a member of this project"
-    }
+    - 400: Owner cannot be removed from the project.
+    - 400: User is not a member of this project.
+    - 404: Project not found or requesting user is not a member.
 
     Notes:
-    - Owner cannot remove themselves
-    - Only existing members can be removed
+    - Non-members receive 404 to avoid leaking project existence.
+    - A MEMBER_REMOVED event is recorded on success.
     """
     permission_classes = [IsAuthenticated]
 
@@ -379,24 +378,34 @@ class EventListView(ListAPIView):
     Project event log endpoint.
 
     Methods:
-    - GET /api/projects/{id}/events/
+    - GET /api/v1/projects/{id}/events/ -> List all events for a project.
 
     Permission:
     - Project members only
 
-    Response:
-    [
-        {
-            "id": 1,
-            "actor": "user1",
-            "action": "PROJECT_CREATED",
-            "project": 1,
-            "task": 1,
-            "target_user": 2,
-            "metadata": {...},
-            "created_at": "2026-03-20T07:47:15Z"
-        }
-    ]
+    GET Response (200):
+    {
+        "count": 2,
+        "next": null,
+        "previous": null,
+        "results": [
+            {
+                "id": 1,
+                "actor": "user1",
+                "action": "TASK_CREATED",
+                "task": 3,
+                "target_user": null,
+                "metadata": { "title": "Fix bug" },
+                "created_at": "2026-03-20T07:47:15Z"
+            }
+        ]
+    }
+
+    Notes:
+    - Non-members receive 404 to avoid leaking project existence.
+    - Events are ordered newest first.
+    - Results are paginated (default page size: 20).
+    - Response is cached per project (TTL: 5 minutes).
     """
 
     serializer_class = EventSerializer

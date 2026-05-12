@@ -13,26 +13,23 @@ class DashboardView(APIView):
     Dashboard summary endpoint.
 
     Methods:
-    - GET /api/dashboard/ -> Retrieve summary statistics for the authenticated user
+    - GET /api/v1/dashboard/ -> Retrieve summary statistics for the authenticated user
 
     Permission: IsAuthenticated
 
-    Description:
-    - Returns aggregated data related to the user's projects and tasks.
-    - Only includes projects where the user is a member.
-    - Tasks are counted across all those projects.
-
-    Response:
+    GET Response (200):
     {
-      "total_projects": 4,
-      "total_tasks": 25,
-      "completed_tasks": 9
+        "total_projects": 4,
+        "total_tasks": 25,
+        "completed_tasks": 9
     }
 
     Notes:
+    - Only includes projects where the user is a member.
+    - Tasks are counted across all those projects.
+    - completed_tasks only counts tasks with status DONE.
     - Uses database-level aggregation for efficiency.
-    - Avoids loading all tasks into memory.
-    - "completed_tasks" only counts tasks with status = "DONE".
+    - Response is cached per user (TTL: 5 minutes).
     """
     permission_classes = [IsAuthenticated]
 

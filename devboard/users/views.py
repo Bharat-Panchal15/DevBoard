@@ -23,28 +23,31 @@ class RegisterView(APIView):
     User registration endpoint.
 
     Methods:
-    - POST /api/register/ -> Create a new user account
+    - POST /api/v1/register/ -> Create a new user account
 
     Permission: IsAnonymous
 
     Request body:
     {
-      "username": "john_doe",
-      "email": "john@example.com",
-      "password": "secure_password"
+        "username": "user1",
+        "email": "user1@example.com",
+        "password": "password123"
     }
 
-    Response:
+    Response (201):
     {
-      "user": { ... user profile ... },
-      "access": "<access_token>",
-      "refresh": "<refresh_token>"
+        "detail": "OTP sent to your email. Please verify."
     }
 
     Validation:
     - Username cannot contain '@' or look like an email.
     - Email must be unique.
     - Password is hashed before storage.
+    - User is inactive until OTP is verified.
+
+    Notes:
+    - A 6-digit OTP is generated and emitted upon successful registration.
+    - Use api/v1/otp/verify/ to activate the account.
     """
     permission_classes = [IsAnonymous]
     throttle_classes = [RegisterRateThrottle]
@@ -77,25 +80,26 @@ class LoginView(APIView):
     User login endpoint.
 
     Methods:
-    - POST /api/login/ -> Authenticate user and issue tokens
+    - POST /api/v1/login/ -> Authenticate user and issue tokens
 
     Permission: IsAnonymous
 
     Request body:
     {
-      "identifier": "john_doe",   (can be username or email)
-      "password": "secure_password"
+        "identifier": "user1",   (can be username or email)
+        "password": "password123"
     }
 
     Response:
     {
-      "user": { ... user profile ... },
-      "access": "<access_token>",
-      "refresh": "<refresh_token>"
+        "user": {"id": 1, "username": "user1", "email": "user1@example.com", "date_joined": "..."},
+        "access": "<access_token>",
+        "refresh": "<refresh_token>"
     }
 
     Notes:
     - Identifier can be either username or email.
+    - Unverified (inactive) users cannot log in.
     - Returns 200 OK with tokens on successful login.
     """
     permission_classes = [IsAnonymous]
@@ -138,13 +142,13 @@ class LogoutView(APIView):
     User logout endpoint.
 
     Methods:
-    - POST /api/{version}/logout/ -> Blacklist refresh token
+    - POST /api/v1/logout/ -> Blacklist refresh token
 
     Permission: IsAuthenticated
 
     Request body:
     {
-      "refresh": "<refresh_token>"
+        "refresh": "<refresh_token>"
     }
 
     Response: 204 No Content on success
@@ -152,6 +156,7 @@ class LogoutView(APIView):
     Notes:
     - Requires SimpleJWT token_blacklist app to be enabled in INSTALLED_APPS.
     - Blacklisting prevents token reuse after logout.
+    - Access token expires naturally afeter its lifetime (15 minutes).
     """
     permission_classes = [IsAuthenticated]
     
@@ -178,6 +183,37 @@ class LogoutView(APIView):
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 class OTPVerifyView(APIView):
+    """
+    otp verification endpoint
+    
+    Methods:
+    - POST /api/v1/otp/verify/ -> Verify OTP and activate user account
+
+    Permission: IsAnonymous
+
+    Request body:
+    {
+        "email": "user1@example.com",
+        "code": "123456"
+    }
+
+    Response (200):
+    {
+        "user": {"id": 1, "username": "user1", "email": "user1@example.com", "date_joined": "..."},
+        "access": "<access_token>",
+        "refresh": "<refresh_token>"
+    }
+
+    Errors:
+    - 400: Invalid email or code.
+    - 400: OTP has expired.
+
+    Notes:
+    - OTP is valid for 10 minutes.
+    - On success, user is activated and JWT tokens are returned.
+    - OTP is deleted after successful verification.
+    """
+    
     permission_classes = [IsAnonymous]
     throttle_classes = [OTPVerifyRateThrottle]
 
@@ -203,6 +239,32 @@ class OTPVerifyView(APIView):
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 class OTPResendView(APIView):
+    """
+    OTP resend endpoint.
+
+    Methods:
+    - POST /api/v1/otp/resend/ -> Resend a new OTP to the user's email
+
+    Permission: IsAnonymous
+
+    Request body:
+    {
+        "email": "user1@example.com"
+    }
+
+    Response (200):
+    {
+        "detail": "New OTP sent to your email"
+    }
+
+    Errors:
+    - 400: Email not found.
+    - 400: User is already verified.
+
+    Notes:
+    - Previous OTP is deleted before generating a new one.
+    - New OTP is valid for 10 minutes.
+    """
     permission_classes = [IsAnonymous]
     throttle_classes = [OTPResendRateThrottle]
 

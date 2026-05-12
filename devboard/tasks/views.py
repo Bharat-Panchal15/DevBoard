@@ -16,56 +16,73 @@ from projects.models import Project
 )
 class TaskListCreateView(ListCreateAPIView):
     """
-    Task list & creation endpoint (within a project).
+    Task list & creation endpoint.
 
     Methods:
-    - GET  /api/projects/{id}/tasks/   -> List all tasks for a project
-    - POST /api/projects/{id}/tasks/   -> Create a new task in the project
+    - GET  /api/v1/projects/{id}/tasks/   -> List all tasks for a project
+    - POST /api/v1/projects/{id}/tasks/   -> Create a new task in the project
 
     Permission:
-    - Only project members can access
+    - Project members only
 
-    GET Response:
-    [
-        {
-            "id": 1,
-            "title": "Setup backend",
-            "description": "Initialize Django project",
-            "project": 1,
-            "assigned_to": 2,
-            "status": "TODO",
-            "due_date": "2026-03-25",
-            "created_at": "2026-03-20T07:47:15Z"
-        }
-    ]
+    GET Response (200):
+    {
+        "count": 1,
+        "next": null,
+        "previous": null,
+        "results": [
+            {
+                "id": 1,
+                "title": "Fix the bug",
+                "description": "Investigate and fix the login bug",
+                "project": 1,
+                "assigned_to": 2,
+                "created_by": "user1",
+                "status": "TODO",
+                "due_date": "2026-04-01",
+                "created_at": "2026-03-20T07:47:15Z"
+            }
+        ]
+    }
 
     POST Request:
     {
-        "title": "Setup backend",
-        "description": "Initialize Django project",
+        "title": "Fix the bug",
+        "description": "Investigate and fix the login bug",
         "assigned_to": 2,
         "status": "TODO",
-        "due_date": "2026-03-25"
+        "due_date": "2026-04-01"
     }
 
-    POST Response:
+    POST Response (201):
     {
         "id": 1,
-        "title": "Setup backend",
-        "description": "Initialize Django project",
+        "title": "Fix the bug",
+        "description": "Investigate and fix the login bug",
         "project": 1,
         "assigned_to": 2,
+        "created_by": "user1",
         "status": "TODO",
-        "due_date": "2026-03-25",
+        "due_date": "2026-04-01",
         "created_at": "2026-03-20T07:47:15Z"
     }
+
+    Filtering / Search / Ordering:
+    - ?status=TODO              -> Filter by status (TODO, IN_PROGRESS, DONE)
+    - ?assigned_to=me           -> Filter tasks assigned to the authenticated user
+    - ?assigned_to={user_id}    -> Filter tasks assigned to a specific user
+    - ?search=keyword           -> Search by title
+    - ?ordering=due_date        -> Order by due_date or created_at (prefix - for descending)
 
     Validation:
     - assigned_to must be a project member
     - status must be one of: TODO, IN_PROGRESS, DONE
 
     Notes:
-    - Project is taken from URL, not request body
+    - Non-members receive 403.
+    - Project is taken from the URL, not the request body.
+    - created_by is automatically set to the authenticated user.
+    - Results are paginated (default page size: 20).
     """
     serializer_class = TaskSerializer
     permission_classes = [IsAuthenticated]
@@ -135,32 +152,32 @@ class TaskDetailView(RetrieveUpdateDestroyAPIView):
     Task detail endpoint.
 
     Methods:
-    - GET    /api/tasks/{id}/     -> Retrieve task details
-    - PUT    /api/tasks/{id}/     -> Update entire task
-    - PATCH  /api/tasks/{id}/     -> Partial update
-    - DELETE /api/tasks/{id}/     -> Delete task
+    - GET    /api/v1/tasks/{id}/     -> Retrieve task details
+    - PUT    /api/v1/tasks/{id}/     -> Full update
+    - PATCH  /api/v1/tasks/{id}/     -> Partial update
+    - DELETE /api/v1/tasks/{id}/     -> Delete task
 
-    Permission:
-    - Only project members can access
-    - Enforced using IsMember permission
+    Permission: IsMember
 
-    GET Response:
+    GET Response (200):
     {
         "id": 1,
-        "title": "Setup backend",
-        "description": "Initialize Django project",
+        "title": "Fix the bug",
+        "description": "Investigate and fix the login bug",
         "project": 1,
         "assigned_to": 2,
+        "created_by": "user1",
         "status": "TODO",
-        "due_date": "2026-03-25",
+        "due_date": "2026-04-01",
         "created_at": "2026-03-20T07:47:15Z"
     }
 
-    PATCH / PUT Examples:
+    PATCH Examples:
 
-    1. Update status:
+    1. Update title/description/due_date:
     {
-        "status": "DONE"
+        "title": "Updated title",
+        "due_date": "2026-04-10"
     }
 
     2. Assign task:
@@ -173,11 +190,9 @@ class TaskDetailView(RetrieveUpdateDestroyAPIView):
         "assigned_to": null
     }
 
-    4. Update title/description:
+    4. Change status:
     {
-        "title": "Updated title",
-        "description": "Updated description",
-        "due_date": "2026-04-01"
+        "status": "IN_PROGRESS"
     }
 
     DELETE Response:
@@ -188,7 +203,10 @@ class TaskDetailView(RetrieveUpdateDestroyAPIView):
     - status must be one of: TODO, IN_PROGRESS, DONE
 
     Notes:
-    - Task must belong to a project where user is a member
+    - Non-members receive 404 to avoid leaking task existence.
+    - assign_task, change_status, and update_task are handled as separate service calls.
+    - Events are recorded only if values actually changed.
+    - An email notification is sent to the assignee via Celery on assignment.
     """
     serializer_class = TaskSerializer
     permission_classes = [IsAuthenticated, IsMember]
@@ -257,29 +275,33 @@ class TaskDetailView(RetrieveUpdateDestroyAPIView):
 )
 class CommentListCreateView(ListCreateAPIView):
     """
-    Comment list & creation endpoint (within a task).
+    Comment list & creation endpoint.
 
     Methods:
-    - GET  /api/tasks/{id}/comments/   -> List all comments for a task
-    - POST /api/tasks/{id}/comments/   -> Create a new comment in the task
+    - GET  /api/v1/tasks/{id}/comments/   -> List all comments for a task
+    - POST /api/v1/tasks/{id}/comments/   -> Create a new comment in the task
 
     Permission:
-    - Only project members can access
-    - Enforced using IsMember permission
+    - Project members only
     
-    GET Response:
-    [
-        {
-            "id": 1,
-            "content": "Great job!",
-            "author": "user1",
-            "created_at": "2026-03-20T07:47:15Z"
-        }
-    ]
+    GET Response (200):
+    {
+        "count": 1,
+        "next": null,
+        "previous": null,
+        "results": [
+            {
+                "id": 1,
+                "content": "Looks good to me!",
+                "author": "user1",
+                "created_at": "2026-03-20T07:47:15Z"
+            }
+        ]
+    }
     
     POST Request:
     {
-        "content": "Great job!"
+        "content": "Looks good to me!"
     }
 
     POST Response:
@@ -291,11 +313,15 @@ class CommentListCreateView(ListCreateAPIView):
     }
 
     Validation:
-    - content cannot be empty
-    - author must be a project member
+    - content cannot be empty or whitespace only.
 
     Notes:
-    - Task is taken from URL, not request body
+    - Non-members receive 403.
+    - Task is taken from the URL, not the request body.
+    - author is automatically set to the authenticated user.
+    - Comments are ordered newest first.
+    - A COMMENT_ADDED event is recorded on creation.
+    - Results are paginated (default page size: 20).
     """
 
     serializer_class = CommentSerializer
@@ -342,20 +368,24 @@ class CommentListCreateView(ListCreateAPIView):
 )    
 class CommentDeleteView(DestroyAPIView):
     """
-    Comment detail endpoint.
+    Comment delete endpoint.
 
     Methods:
-    - DELETE /api/comments/{id}/   -> Delete a comment
+    - DELETE /api/v1/comments/{id}/   -> Delete a comment
 
-    Permission:
-    - Only project members can access
-    - Enforced using IsMember permission
+    Permission: IsAuthor
 
     DELETE Response:
     - 204 No Content
 
-    Validation:
-    - author must be a project member
+    Errors:
+    - 401: Unauthenticated request.
+    - 403: User is not the comment author.
+    - 404: Comment not found or user is not a project member.
+
+    Notes:
+    - Only the comment author can delete their comment.
+    - Non-members receive 404 to avoid leaking comment existence.
     """
 
     serializer_class = CommentSerializer
