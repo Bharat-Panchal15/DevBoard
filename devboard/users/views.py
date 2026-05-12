@@ -53,15 +53,15 @@ class RegisterView(APIView):
     throttle_classes = [RegisterRateThrottle]
 
     @extend_schema(
-            tags=["Users"],
+            tags=["Auth"],
             request=RegisterSerializer,
             responses={
-                201: _auth_response_serializer(name="RegisterResponse"),
+                201: OpenApiResponse(description="OTP sent to email"),
                 400: OpenApiResponse(description="Validation error"),
                 403: OpenApiResponse(description="Already authenticated"),
             },
             summary="Register a new user",
-            description="Creates a new user account and returns JWT tokens."
+            description="Creates a new inactive user account, generates an OTP and sends it to the provided email for verification."
     )
     def post(self, request):
         serializer = RegisterSerializer(data=request.data)
@@ -106,15 +106,15 @@ class LoginView(APIView):
     throttle_classes = [LoginRateThrottle]
 
     @extend_schema(
-            tags=["Users"],
+            tags=["Auth"],
             request=LoginSerializer,
             responses={
                 200: _auth_response_serializer(name="LoginResponse"),
-                400: OpenApiResponse(description="Invalid credentials"),
+                400: OpenApiResponse(description="Invalid credentials or unverified account"),
                 403: OpenApiResponse(description="Already authenticated"),
             },
             summary="Login with username or email",
-            description="Authenticate a user using username or email and returns JWT tokens."
+            description="Authenticate a user using username or email and returns JWT token pair."
     )
     def post(self, request):
         serializer = LoginSerializer(data=request.data)
@@ -161,7 +161,7 @@ class LogoutView(APIView):
     permission_classes = [IsAuthenticated]
     
     @extend_schema(
-            tags=["Users"],
+            tags=["Auth"],
             request=LogoutSerializer,
             responses={
                 204: OpenApiResponse(description="Logged out successfully"),
@@ -217,6 +217,17 @@ class OTPVerifyView(APIView):
     permission_classes = [IsAnonymous]
     throttle_classes = [OTPVerifyRateThrottle]
 
+    @extend_schema(
+            tags=["Auth"],
+            request=OTPVerifySerializer,
+            responses={
+                200: _auth_response_serializer(name="OTPVerifyResponse"),
+                400: OpenApiResponse(description="Invalid or expired OTP"),
+                403: OpenApiResponse(description="Already authenticated"),
+            },
+            summary="Verify OTP and activate account",
+            description="Verifies the OTP sent to the user's email. On success, activates the account and returns a JWT token pair."
+    )
     def post(self, request):
         serializer = OTPVerifySerializer(data=request.data)
 
@@ -268,6 +279,17 @@ class OTPResendView(APIView):
     permission_classes = [IsAnonymous]
     throttle_classes = [OTPResendRateThrottle]
 
+    @extend_schema(
+            tags=["Auth"],
+            request=OTPResendSerializer,
+            responses={
+                200: OpenApiResponse(description="New OTP sent to email"),
+                400: OpenApiResponse(description="Invalid email or user already verified"),
+                403: OpenApiResponse(description="Already authenticated")
+            },
+            summary="Resend OTP",
+            description="Deletes the existing OTP and sends a fresh one to the provided email. User must not already be verified."
+    )
     def post(self, request):
         serializer = OTPResendSerializer(data=request.data)
 
