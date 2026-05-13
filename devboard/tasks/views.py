@@ -11,8 +11,16 @@ from tasks.throttles import TaskRateThrottle, CommentRateThrottle
 from projects.models import Project
 
 @extend_schema_view(
-    get=extend_schema(tags=["Tasks"]),
-    post=extend_schema(tags=["Tasks"]),
+    get=extend_schema(
+        tags=["Tasks"],
+        summary="List all tasks for a project",
+        description="Returns a paginated list of all tasks for a project. Supports filtering by status, assigned_to, search by title, and ordering. Only accessible to project members."
+    ),
+    post=extend_schema(
+        tags=["Tasks"],
+        summary="Create a new task",
+        description="Creates a new task in the project. The authenticated user is automatically set as created_by. assigned_to must be a project member."
+    ),
 )
 class TaskListCreateView(ListCreateAPIView):
     """
@@ -142,10 +150,26 @@ class TaskListCreateView(ListCreateAPIView):
         serializer.instance = task
 
 @extend_schema_view(
-    get=extend_schema(tags=["Tasks"]),
-    put=extend_schema(tags=["Tasks"]),
-    patch=extend_schema(tags=["Tasks"]),
-    delete=extend_schema(tags=["Tasks"]),
+    get=extend_schema(
+        tags=["Tasks"],
+        summary="Retrieve a task",
+        description="Returns details of a task. Only accessible to project members. Non-members receive 404."
+    ),
+    put=extend_schema(
+        tags=["Tasks"],
+        summary="Full update a task",
+        description="Fully updates a task. Handles assignment, status change, and field updates as separate service calls. Events are recorded only if values actually changed."
+    ),
+    patch=extend_schema(
+        tags=["Tasks"],
+        summary="Partial update a task",
+        description="Partially updates a task. Handles assignment, status change, and field updates as separate service calls. Events are recorded only if values actually changed."
+    ),
+    delete=extend_schema(
+        tags=["Tasks"],
+        summary="Delete a task",
+        description="Deletes a task. Only accessible to project members."
+    ),
 )
 class TaskDetailView(RetrieveUpdateDestroyAPIView):
     """
@@ -270,8 +294,16 @@ class TaskDetailView(RetrieveUpdateDestroyAPIView):
         )
 
 @extend_schema_view(
-    get=extend_schema(tags=["Comments"]),
-    post=extend_schema(tags=["Comments"]),
+    get=extend_schema(
+        tags=["Comments"],
+        summary="List all comments for a task",
+        description="Returns a paginated list of all comments for a task, ordered newest first. Only accessible to project members."
+    ),
+    post=extend_schema(
+        tags=["Comments"],
+        summary="Add a comment to a task",
+        description="Creates a new comment on a task. The authenticated user is automatically set as author. Content cannot be empty."
+    ),
 )
 class CommentListCreateView(ListCreateAPIView):
     """
@@ -364,7 +396,11 @@ class CommentListCreateView(ListCreateAPIView):
         serializer.instance = comment
 
 @extend_schema_view(
-    delete=extend_schema(tags=["Comments"]),
+    delete=extend_schema(
+        tags=["Comments"],
+        summary="Delete a comment",
+        description="Deletes a comment. Only the comment author can perform this action. Non-members receive 404."
+    ),
 )    
 class CommentDeleteView(DestroyAPIView):
     """
