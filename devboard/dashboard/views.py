@@ -46,7 +46,7 @@ class DashboardView(APIView):
                 )
             },
             summary="Get dashboard summary",
-            description="Returns aggregated statistics for the authenticated user's projects and tasks."
+            description="Returns aggregated statistics for the authenticated user's projects and tasks. Response is cached per user (TTL: 5 minutes)."
     )
     def get(self, request):
         user = request.user
