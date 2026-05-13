@@ -278,10 +278,6 @@ class ProjectMembersView(APIView):
             description="Returns all members of a project. Only accessible to project members. Non-members receive 404."
     )
     def get(self, request, id):
-        """
-        GET /projects/{id}/members/
-        List all members (only for project members)
-        """
         project = self.get_project(id, request.user)
         members = project.members.all().values("id", "username", "email")
 
@@ -300,13 +296,8 @@ class ProjectMembersView(APIView):
             description="Adds a new member to the project. Only the project owner can perform this action."
     )
     def post(self, request, id):
-        """
-        POST /projects/{id}/members/
-        Add a new member (only owner)
-        """
         project = self.get_project(id, request.user)
 
-        # 🔒 Only owner can add members
         if project.owner != request.user:
             return Response({"detail": "Only owner can add members"}, status=status.HTTP_403_FORBIDDEN)
 
@@ -359,10 +350,6 @@ class RemoveMemberView(APIView):
         return super().get_throttles()
 
     def get_project(self, id, user):
-        """
-        Fetch project only if user is a member.
-        Otherwise return 404 (security).
-        """
         return get_object_or_404(Project.objects.filter(members=user), id=id)
     
     @extend_schema(
@@ -377,10 +364,6 @@ class RemoveMemberView(APIView):
             description="Removes a member from the project, Only the project owner can perform this action. Owner cannot be removed."
     )
     def delete(self, request, id, user_id):
-        """
-        DELETE /projects/{id}/members/{user_id}/
-        Only owner can remove members.
-        """
         project = self.get_project(id, request.user)
         member = get_object_or_404(User, id=user_id)
 
